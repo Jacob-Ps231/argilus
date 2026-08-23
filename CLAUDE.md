@@ -11,7 +11,7 @@ cultures dans un conteneur.
 | Loader             | Fabric               |
 | JDK                | 25                   |
 | Gradle             | 9.5.1                |
-| Fabric Loom        | 1.17                 |
+| Fabric Loom        | 1.17.19              |
 | Fabric Loader      | 0.19.3               |
 | Fabric API         | 0.158.0+26.2         |
 | Mappings           | aucune (désobfusqué) |
