@@ -1,0 +1,26 @@
+{
+	"schemaVersion": 1,
+	"id": "argilus",
+	"version": "${version}",
+	"name": "Argilus",
+	"description": "A clay golem that harvests crops, replants them and stores them in a container.",
+	"authors": [
+		"Jerome"
+	],
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"re.jerome.argilus.Argilus"
+		],
+		"client": [
+			"re.jerome.argilus.client.ArgilusClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
