@@ -28,8 +28,9 @@ public class ArgilusEntity extends PathfinderMob {
 	@Override
 	protected void registerGoals() {
 		this.goalSelector.addGoal(0, new FloatGoal(this));
-		this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.6));
-		this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 6.0F));
-		this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(1, new HarvestCropGoal(this));
+		this.goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 0.6));
+		this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
 	}
 }

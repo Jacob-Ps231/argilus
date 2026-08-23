@@ -17,6 +17,9 @@
 			"re.jerome.argilus.client.ArgilusClient"
 		]
 	},
+	"mixins": [
+		"argilus.mixins.json"
+	],
 	"depends": {
 		"fabricloader": ">=0.19.3",
 		"minecraft": "~26.2",

@@ -13,6 +13,7 @@ public class Argilus implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ArgilusConfig.load();
 		ModEntityTypes.register();
 		ModItems.register();
 	}
