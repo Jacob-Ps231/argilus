@@ -15,6 +15,7 @@ bien faits.
 | Point                  | Valeur retenue                                    |
 | ---------------------- | ------------------------------------------------- |
 | Nom du mob             | Argilus / Golem d'argile                          |
+| Taille du mob          | hitbox du golem de cuivre (0.49 × 0.98)           |
 | Invocation             | citrouille sculptée **ou lanterne** sur un bloc d'argile |
 | Rayon d'action         | 12 blocs (config : 4 à 24)                        |
 | Cadence de récolte     | 1 bloc max toutes les 20 ticks (1 s)              |
