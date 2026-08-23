@@ -13,6 +13,8 @@ cultures dans un conteneur.
 | Gradle             | 9.5.1                |
 | Fabric Loom        | 1.17                 |
 | Fabric Loader      | 0.19.3               |
+| Fabric API         | 0.158.0+26.2         |
+| Mappings           | aucune (désobfusqué) |
 | Mod ID             | `argilus`            |
 | Package            | `re.jerome.argilus`  |
 | Licence            | MIT                  |
