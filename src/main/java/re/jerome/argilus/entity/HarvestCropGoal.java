@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -124,6 +125,12 @@ public class HarvestCropGoal extends Goal {
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
 		boolean replanting = takeSeed(drops, state.getBlock());
 
+		// Nothing in the harvest can reseed it, so fall back on what the golem
+		// already carries rather than leave the tile bare.
+		if (!replanting) {
+			replanting = this.takeSeedFromInventory(state.getBlock());
+		}
+
 		// false: keep the break particles and sound, skip the vanilla drops,
 		// which we hand out ourselves once a seed has been set aside.
 		level.destroyBlock(pos, false, this.golem);
@@ -138,10 +145,18 @@ public class HarvestCropGoal extends Goal {
 		}
 
 		for (ItemStack stack : drops) {
-			if (!stack.isEmpty()) {
-				Block.popResource(level, pos, stack);
+			if (stack.isEmpty()) {
+				continue;
+			}
+
+			ItemStack rest = this.golem.getInventory().addItem(stack);
+
+			if (!rest.isEmpty()) {
+				Block.popResource(level, pos, rest);
 			}
 		}
+
+		this.golem.resetIdleTicks();
 	}
 
 	// The seed is the drop whose item places the very block just harvested.
@@ -150,13 +165,39 @@ public class HarvestCropGoal extends Goal {
 	// seed keeps the net yield identical to a player replanting behind himself.
 	private static boolean takeSeed(List<ItemStack> drops, Block harvested) {
 		for (ItemStack stack : drops) {
-			if (stack.getItem() instanceof BlockItem item && item.getBlock() == harvested) {
+			if (isSeedFor(stack, harvested)) {
 				stack.shrink(1);
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	private boolean takeSeedFromInventory(Block harvested) {
+		SimpleContainer inventory = this.golem.getInventory();
+
+		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+			ItemStack stack = inventory.getItem(slot);
+
+			if (isSeedFor(stack, harvested)) {
+				stack.shrink(1);
+
+				if (stack.isEmpty()) {
+					inventory.setItem(slot, ItemStack.EMPTY);
+				}
+
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean isSeedFor(ItemStack stack, Block harvested) {
+		return !stack.isEmpty()
+				&& stack.getItem() instanceof BlockItem item
+				&& item.getBlock() == harvested;
 	}
 
 	private void rescanIfDue(ServerLevel level) {
@@ -176,6 +217,9 @@ public class HarvestCropGoal extends Goal {
 		int radius = ArgilusConfig.get().radius();
 		BlockPos origin = this.golem.blockPosition();
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+		long sumX = 0;
+		long sumY = 0;
+		long sumZ = 0;
 
 		for (int dx = -radius; dx <= radius; dx++) {
 			for (int dz = -radius; dz <= radius; dz++) {
@@ -184,9 +228,20 @@ public class HarvestCropGoal extends Goal {
 
 					if (level.isLoaded(cursor) && isRipe(level, cursor)) {
 						this.ripe.add(cursor.immutable());
+						sumX += cursor.getX();
+						sumY += cursor.getY();
+						sumZ += cursor.getZ();
 					}
 				}
 			}
+		}
+
+		// The deposit goal looks for a container around the field, not around
+		// wherever the golem happens to be standing.
+		if (!this.ripe.isEmpty()) {
+			int count = this.ripe.size();
+			this.golem.setFieldCenter(new BlockPos(
+					(int) (sumX / count), (int) (sumY / count), (int) (sumZ / count)));
 		}
 	}
 
