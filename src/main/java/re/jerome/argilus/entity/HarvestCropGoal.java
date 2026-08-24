@@ -5,9 +5,15 @@ import java.util.EnumSet;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
 import re.jerome.argilus.ArgilusConfig;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
@@ -94,7 +100,7 @@ public class HarvestCropGoal extends Goal {
 
 		if (this.target.closerToCenterThan(this.golem.position(), HARVEST_REACH)) {
 			if (now >= this.nextHarvestTime) {
-				level.destroyBlock(this.target, true, this.golem);
+				this.harvest(level, this.target);
 				this.ripe.remove(this.target);
 				this.target = null;
 				this.nextHarvestTime = now + ArgilusConfig.get().harvestIntervalTicks();
@@ -104,6 +110,53 @@ public class HarvestCropGoal extends Goal {
 			this.ripe.remove(this.target);
 			this.target = null;
 		}
+	}
+
+	private void harvest(ServerLevel level, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+
+		if (!(state.getBlock() instanceof CropBlock crop) || !crop.isMaxAge(state)) {
+			return;
+		}
+
+		// Read the drops while the block still stands. getDrops does not spawn
+		// item entities, unlike every dropResources overload.
+		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
+		boolean replanting = takeSeed(drops, state.getBlock());
+
+		// false: keep the break particles and sound, skip the vanilla drops,
+		// which we hand out ourselves once a seed has been set aside.
+		level.destroyBlock(pos, false, this.golem);
+
+		if (replanting) {
+			BlockState seedling = crop.getStateForAge(0);
+			level.setBlock(pos, seedling, Block.UPDATE_ALL);
+			level.gameEvent(GameEvent.BLOCK_PLACE, pos, GameEvent.Context.of(this.golem, seedling));
+			level.playSound(
+					null, pos.getX(), pos.getY(), pos.getZ(),
+					SoundEvents.CROP_PLANTED, SoundSource.BLOCKS, 1.0F, 1.0F);
+		}
+
+		for (ItemStack stack : drops) {
+			if (!stack.isEmpty()) {
+				Block.popResource(level, pos, stack);
+			}
+		}
+	}
+
+	// The seed is the drop whose item places the very block just harvested.
+	// CropBlock.getBaseSeedId is protected and unreachable from a mod, and a
+	// hardcoded table would not survive contact with modded crops. Consuming one
+	// seed keeps the net yield identical to a player replanting behind himself.
+	private static boolean takeSeed(List<ItemStack> drops, Block harvested) {
+		for (ItemStack stack : drops) {
+			if (stack.getItem() instanceof BlockItem item && item.getBlock() == harvested) {
+				stack.shrink(1);
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private void rescanIfDue(ServerLevel level) {

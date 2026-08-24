@@ -176,6 +176,11 @@ Départ vers le conteneur si plein, ou après 100 ticks sans rien à faire avec 
 inventaire non vide. Gérer le conteneur plein et le conteneur détruit sans boucle
 infinie.
 
+Si les drops d'une récolte ne contiennent aucune graine replantable, en prélever
+une dans l'inventaire plutôt que laisser la case vide. Ne se déclenche avec aucune
+culture vanilla, qui dropent toutes leur graine — c'est un filet pour les cultures
+moddées.
+
 *Validé quand :* le cycle complet tourne 10 minutes sans intervention, et l'état
 survit à un reload du monde.
 
