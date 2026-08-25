@@ -1,6 +1,8 @@
 package re.jerome.argilus.entity;
 
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -22,6 +24,11 @@ public class DepositGoal extends Goal {
 	private static final int SEARCH_VERTICAL_REACH = 4;
 
 	private final ArgilusEntity golem;
+
+	// Containers that refused a delivery, and until when to leave them alone.
+	// Without this the search would keep electing the same full chest.
+	private final Map<BlockPos, Long> fullUntil = new HashMap<>();
+
 	private @Nullable BlockPos container;
 	private long nextAttemptTime;
 	private int openTicks;
@@ -54,7 +61,14 @@ public class DepositGoal extends Goal {
 		}
 
 		this.container = this.resolveContainer(level);
-		return this.container != null;
+
+		if (this.container == null) {
+			// Nothing to deposit into: do not rescan the whole radius next tick.
+			this.nextAttemptTime = level.getGameTime() + RETRY_COOLDOWN;
+			return false;
+		}
+
+		return true;
 	}
 
 	@Override
@@ -82,9 +96,8 @@ public class DepositGoal extends Goal {
 
 		long now = level.getGameTime();
 
-		// Container full and nowhere left to put anything: stand by it rather
-		// than walk back and forth for nothing. A golem waiting at a full chest
-		// is something the player can read at a glance.
+		// Every container around is full: stand by rather than walk back and
+		// forth. The harvest goal still takes over when a crop ripens nearby.
 		if (this.waitingForSpace) {
 			this.golem.getNavigation().stop();
 			this.lookAtContainer();
@@ -139,6 +152,7 @@ public class DepositGoal extends Goal {
 		}
 
 		boolean leftover = this.unload(target);
+		BlockPos used = this.container;
 		this.closeContainer();
 		this.openTicks = 0;
 		this.golem.resetIdleTicks();
@@ -148,12 +162,24 @@ public class DepositGoal extends Goal {
 			return;
 		}
 
-		this.nextAttemptTime = now + RETRY_COOLDOWN;
+		// It could not take everything. Look elsewhere before giving up.
+		this.fullUntil.put(used, now + RETRY_COOLDOWN);
+		this.golem.setDepositPos(null);
+		this.container = null;
 
-		if (this.golem.isInventoryFull()) {
-			this.waitingForSpace = true;
-		} else {
-			this.container = null;
+		BlockPos alternative = this.resolveContainer(level);
+
+		if (alternative != null) {
+			this.container = alternative;
+			this.nextAttemptTime = now;
+			return;
+		}
+
+		this.nextAttemptTime = now + RETRY_COOLDOWN;
+		this.waitingForSpace = this.golem.isInventoryFull();
+
+		if (this.waitingForSpace) {
+			this.container = used;
 		}
 	}
 
@@ -208,9 +234,14 @@ public class DepositGoal extends Goal {
 	}
 
 	private @Nullable BlockPos resolveContainer(ServerLevel level) {
+		long now = level.getGameTime();
+		this.fullUntil.values().removeIf(until -> until <= now);
+
 		BlockPos remembered = this.golem.getDepositPos();
 
-		if (remembered != null && HopperBlockEntity.getContainerAt(level, remembered) != null) {
+		if (remembered != null
+				&& !this.fullUntil.containsKey(remembered)
+				&& HopperBlockEntity.getContainerAt(level, remembered) != null) {
 			return remembered;
 		}
 
@@ -229,6 +260,7 @@ public class DepositGoal extends Goal {
 					cursor.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
 
 					if (!level.isLoaded(cursor)
+							|| this.fullUntil.containsKey(cursor)
 							|| !level.getBlockState(cursor).is(ArgilusTags.DEPOSIT_CONTAINERS)) {
 						continue;
 					}
@@ -248,11 +280,6 @@ public class DepositGoal extends Goal {
 		}
 
 		this.golem.setDepositPos(best);
-
-		if (best == null) {
-			this.nextAttemptTime = level.getGameTime() + RETRY_COOLDOWN;
-		}
-
 		return best;
 	}
 }

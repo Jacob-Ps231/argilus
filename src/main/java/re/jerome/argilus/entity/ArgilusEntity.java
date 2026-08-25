@@ -15,6 +15,7 @@ import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.npc.InventoryCarrier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -45,6 +46,7 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 
 	public ArgilusEntity(EntityType<? extends ArgilusEntity> type, Level level) {
 		super(type, level);
+		this.setCanPickUpLoot(true);
 	}
 
 	public static AttributeSupplier.Builder createAttributes() {
@@ -176,5 +178,18 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 				this.overflow.add(rest);
 			}
 		}
+	}
+
+	// Vanilla only offers items the golem physically walks over, so this stays
+	// scoped to its working area without any radius logic of our own. It also
+	// lets it recover the contents of a chest a player broke.
+	@Override
+	public boolean wantsToPickUp(ServerLevel level, ItemStack stack) {
+		return this.inventory.canAddItem(stack);
+	}
+
+	@Override
+	protected void pickUpItem(ServerLevel level, ItemEntity itemEntity) {
+		InventoryCarrier.pickUpItem(level, this, this, itemEntity);
 	}
 }
