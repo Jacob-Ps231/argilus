@@ -7,6 +7,8 @@ import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.ContainerUser;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -24,8 +26,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ContainerOpenersCounter;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.storage.ValueInput;
@@ -36,6 +40,10 @@ import re.jerome.argilus.ArgilusConfig;
 public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, ContainerUser {
 	private static final double CONTAINER_REACH = 3.0;
 	private static final int BONE_MEAL_SUPPRESSION = 1200;
+
+	// Borrowed from the clay block until the golem gets sounds of its own, read
+	// from the block rather than hardcoded so it follows any vanilla change.
+	private static final SoundType CLAY = Blocks.CLAY.defaultBlockState().getSoundType();
 
 	private final SimpleContainer inventory = new SimpleContainer(ArgilusConfig.get().inventorySize());
 
@@ -164,6 +172,21 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 
 	public void resetIdleTicks() {
 		this.idleTicks = 0;
+	}
+
+	@Override
+	protected SoundEvent getHurtSound(DamageSource source) {
+		return CLAY.getHitSound();
+	}
+
+	@Override
+	protected SoundEvent getDeathSound() {
+		return CLAY.getBreakSound();
+	}
+
+	@Override
+	protected void playStepSound(BlockPos pos, BlockState state) {
+		this.playSound(CLAY.getStepSound(), 0.4F, 1.0F);
 	}
 
 	@Override

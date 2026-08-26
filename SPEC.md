@@ -207,6 +207,18 @@ Détection du pattern (les deux chemins), modèle et texture propres (export
 Blockbench), sons, config, fichiers de langue FR/EN. L'œuf de spawn passe en
 creative uniquement.
 
+Scindée en deux, le modèle demandant un export Blockbench qui n'existe pas
+encore :
+
+- **7a** — détection du pattern et sons. La config et les fichiers de langue
+  étaient déjà faits en chemin, et l'œuf de spawn est creative par nature.
+  Les sons sont empruntés au bloc d'argile en attendant les nôtres.
+- **7b** — modèle, texture, et le hitbox du golem de cuivre figé plus haut. À
+  cette taille le volume tombe sous le seuil de `FarmlandBlock.fallOn` : vérifier
+  que le mixin de piétinement devient inutile avant de le supprimer.
+
+Le golem garde l'apparence du golem de fer entre les deux.
+
 ### Étape 8 — Passe de compatibilité
 
 Test avec au moins un mod de cultures tiers, si disponible en 26.2. Ajustement du
