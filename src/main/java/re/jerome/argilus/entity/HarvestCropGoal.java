@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -11,6 +13,9 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -21,16 +26,24 @@ import re.jerome.argilus.ArgilusConfig;
 // max age, no hardcoded block list, so modded crops extending CropBlock work.
 // Unlike the villager, targets are cached and rescanned periodically instead of
 // being rebuilt from a 3x3x3 cube every time.
+//
+// Pumpkins and melons are found from their stem, never by looking for fruit
+// blocks. Nothing in 26.2 identifies a fruit block: no shared superclass, no
+// tag, and StemBlock keeps its fruit and seed fields private with no accessor.
+// But an attached stem only exists while its fruit does, so whatever it points
+// at is its fruit by construction. Decorative pumpkins have no stem aimed at
+// them and are therefore invisible to the golem.
 public class HarvestCropGoal extends Goal {
 	private static final int VERTICAL_REACH = 2;
 	private static final double HARVEST_REACH = 2.5;
 	private static final double SPEED = 0.9;
 
 	private final ArgilusEntity golem;
-	private final List<BlockPos> ripe = new ArrayList<>();
+	private final List<BlockPos> targets = new ArrayList<>();
 	private BlockPos target;
 	private long nextScanTime;
 	private long nextHarvestTime;
+	private ItemStack silkTouch;
 
 	public HarvestCropGoal(ArgilusEntity golem) {
 		this.golem = golem;
@@ -44,12 +57,12 @@ public class HarvestCropGoal extends Goal {
 		}
 
 		this.rescanIfDue(level);
-		return !this.ripe.isEmpty();
+		return !this.targets.isEmpty();
 	}
 
 	@Override
 	public boolean canContinueToUse() {
-		return !this.ripe.isEmpty();
+		return !this.targets.isEmpty();
 	}
 
 	@Override
@@ -60,7 +73,7 @@ public class HarvestCropGoal extends Goal {
 	@Override
 	public void stop() {
 		this.target = null;
-		this.ripe.clear();
+		this.targets.clear();
 		this.golem.getNavigation().stop();
 	}
 
@@ -78,13 +91,13 @@ public class HarvestCropGoal extends Goal {
 		this.rescanIfDue(level);
 
 		// The player may have harvested it first, or it may have been broken.
-		if (this.target != null && !isRipe(level, this.target)) {
-			this.ripe.remove(this.target);
+		if (this.target != null && !isHarvestable(level, this.target)) {
+			this.targets.remove(this.target);
 			this.target = null;
 		}
 
 		if (this.target == null) {
-			this.target = this.nearestRipe();
+			this.target = this.nearestTarget();
 
 			if (this.target == null) {
 				return;
@@ -106,13 +119,13 @@ public class HarvestCropGoal extends Goal {
 		if (this.target.closerToCenterThan(this.golem.position(), HARVEST_REACH)) {
 			if (now >= this.nextHarvestTime) {
 				this.harvest(level, this.target);
-				this.ripe.remove(this.target);
+				this.targets.remove(this.target);
 				this.target = null;
 				this.nextHarvestTime = now + ArgilusConfig.get().harvestIntervalTicks();
 			}
 		} else if (this.golem.getNavigation().isDone()) {
 			// Unreachable target: drop it rather than stall on it forever.
-			this.ripe.remove(this.target);
+			this.targets.remove(this.target);
 			this.target = null;
 		}
 	}
@@ -120,10 +133,14 @@ public class HarvestCropGoal extends Goal {
 	private void harvest(ServerLevel level, BlockPos pos) {
 		BlockState state = level.getBlockState(pos);
 
-		if (!(state.getBlock() instanceof CropBlock crop) || !crop.isMaxAge(state)) {
-			return;
+		if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
+			this.harvestCrop(level, pos, state, crop);
+		} else if (hasStemPointingAt(level, pos)) {
+			this.harvestFruit(level, pos, state);
 		}
+	}
 
+	private void harvestCrop(ServerLevel level, BlockPos pos, BlockState state, CropBlock crop) {
 		// Read the drops while the block still stands. getDrops does not spawn
 		// item entities, unlike every dropResources overload.
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
@@ -148,6 +165,22 @@ public class HarvestCropGoal extends Goal {
 					SoundEvents.CROP_PLANTED, SoundSource.BLOCKS, 1.0F, 1.0F);
 		}
 
+		this.collect(level, pos, drops);
+	}
+
+	// Melons drop slices to a bare hand and a whole block to silk touch, and the
+	// loot table decides from the enchantment component of the tool. Asking for
+	// the block generalises to modded stem fruit, unlike special-casing an item.
+	// The stem itself is never touched: only the position it points at.
+	private void harvestFruit(ServerLevel level, BlockPos pos, BlockState state) {
+		List<ItemStack> drops =
+				Block.getDrops(state, level, pos, null, this.golem, this.silkTouchTool(level));
+
+		level.destroyBlock(pos, false, this.golem);
+		this.collect(level, pos, drops);
+	}
+
+	private void collect(ServerLevel level, BlockPos pos, List<ItemStack> drops) {
 		for (ItemStack stack : drops) {
 			if (stack.isEmpty()) {
 				continue;
@@ -161,6 +194,19 @@ public class HarvestCropGoal extends Goal {
 		}
 
 		this.golem.resetIdleTicks();
+	}
+
+	private ItemStack silkTouchTool(ServerLevel level) {
+		if (this.silkTouch == null) {
+			ItemStack tool = new ItemStack(Items.SHEARS);
+			tool.enchant(
+					level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+							.getOrThrow(Enchantments.SILK_TOUCH),
+					1);
+			this.silkTouch = tool;
+		}
+
+		return this.silkTouch;
 	}
 
 	// The seed is the drop whose item places the very block just harvested.
@@ -216,7 +262,7 @@ public class HarvestCropGoal extends Goal {
 	}
 
 	private void scan(ServerLevel level) {
-		this.ripe.clear();
+		this.targets.clear();
 
 		int radius = ArgilusConfig.get().radius();
 		BlockPos origin = this.golem.blockPosition();
@@ -230,11 +276,26 @@ public class HarvestCropGoal extends Goal {
 				for (int dy = -VERTICAL_REACH; dy <= VERTICAL_REACH; dy++) {
 					cursor.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
 
-					if (level.isLoaded(cursor) && isRipe(level, cursor)) {
-						this.ripe.add(cursor.immutable());
-						sumX += cursor.getX();
-						sumY += cursor.getY();
-						sumZ += cursor.getZ();
+					if (!level.isLoaded(cursor)) {
+						continue;
+					}
+
+					BlockState state = level.getBlockState(cursor);
+					BlockPos found = null;
+
+					if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
+						found = cursor.immutable();
+					} else if (state.getBlock() instanceof AttachedStemBlock) {
+						// Two stems can point at the same pumpkin.
+						BlockPos fruit = cursor.relative(state.getValue(AttachedStemBlock.FACING));
+						found = this.targets.contains(fruit) ? null : fruit;
+					}
+
+					if (found != null) {
+						this.targets.add(found);
+						sumX += found.getX();
+						sumY += found.getY();
+						sumZ += found.getZ();
 					}
 				}
 			}
@@ -242,18 +303,18 @@ public class HarvestCropGoal extends Goal {
 
 		// The deposit goal looks for a container around the field, not around
 		// wherever the golem happens to be standing.
-		if (!this.ripe.isEmpty()) {
-			int count = this.ripe.size();
+		if (!this.targets.isEmpty()) {
+			int count = this.targets.size();
 			this.golem.setFieldCenter(new BlockPos(
 					(int) (sumX / count), (int) (sumY / count), (int) (sumZ / count)));
 		}
 	}
 
-	private BlockPos nearestRipe() {
+	private BlockPos nearestTarget() {
 		BlockPos nearest = null;
 		double best = Double.MAX_VALUE;
 
-		for (BlockPos pos : this.ripe) {
+		for (BlockPos pos : this.targets) {
 			double distance = pos.distToCenterSqr(this.golem.position());
 
 			if (distance < best) {
@@ -265,8 +326,30 @@ public class HarvestCropGoal extends Goal {
 		return nearest;
 	}
 
-	private static boolean isRipe(ServerLevel level, BlockPos pos) {
+	private static boolean isHarvestable(ServerLevel level, BlockPos pos) {
 		BlockState state = level.getBlockState(pos);
-		return state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state);
+
+		if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
+			return true;
+		}
+
+		return hasStemPointingAt(level, pos);
+	}
+
+	private static boolean hasStemPointingAt(ServerLevel level, BlockPos pos) {
+		if (level.getBlockState(pos).isAir()) {
+			return false;
+		}
+
+		for (Direction direction : Direction.Plane.HORIZONTAL) {
+			BlockState neighbour = level.getBlockState(pos.relative(direction));
+
+			if (neighbour.getBlock() instanceof AttachedStemBlock
+					&& neighbour.getValue(AttachedStemBlock.FACING) == direction.getOpposite()) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
