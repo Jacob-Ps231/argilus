@@ -94,6 +94,10 @@ public class HarvestCropGoal extends Goal {
 					this.target.getX() + 0.5, this.target.getY(), this.target.getZ() + 0.5, SPEED);
 		}
 
+		// Walking to a crop is work, not idleness. Counting the walk as idle time
+		// sent the golem to the chest after every single crop on a sparse field.
+		this.golem.resetIdleTicks();
+
 		this.golem.getLookControl().setLookAt(
 				this.target.getX() + 0.5, this.target.getY() + 0.5, this.target.getZ() + 0.5);
 

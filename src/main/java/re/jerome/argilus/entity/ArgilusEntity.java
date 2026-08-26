@@ -46,7 +46,6 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 
 	public ArgilusEntity(EntityType<? extends ArgilusEntity> type, Level level) {
 		super(type, level);
-		this.setCanPickUpLoot(true);
 	}
 
 	public static AttributeSupplier.Builder createAttributes() {
@@ -178,6 +177,14 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 				this.overflow.add(rest);
 			}
 		}
+	}
+
+	// Mob persists this flag and readAdditionalSaveData restores it from the
+	// save, so setting it in the constructor is silently undone for any golem
+	// placed before this behaviour existed. Answering here cannot be overwritten.
+	@Override
+	public boolean canPickUpLoot() {
+		return true;
 	}
 
 	// Vanilla only offers items the golem physically walks over, so this stays
