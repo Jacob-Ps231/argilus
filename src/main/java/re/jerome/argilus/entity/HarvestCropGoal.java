@@ -163,6 +163,10 @@ public class HarvestCropGoal extends Goal {
 			level.playSound(
 					null, pos.getX(), pos.getY(), pos.getZ(),
 					SoundEvents.CROP_PLANTED, SoundSource.BLOCKS, 1.0F, 1.0F);
+
+			// Freshly sown, so age 0 and the obvious bone meal target. Park it, or
+			// the two goals feed each other on this one tile until the stack is gone.
+			this.golem.suppressBoneMeal(pos, level.getGameTime());
 		}
 
 		this.collect(level, pos, drops);

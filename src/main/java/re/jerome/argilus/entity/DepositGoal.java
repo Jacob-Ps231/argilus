@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import org.jspecify.annotations.Nullable;
 import re.jerome.argilus.ArgilusConfig;
@@ -194,6 +195,12 @@ public class DepositGoal extends Goal {
 				continue;
 			}
 
+			// Bone meal stays aboard. Handing it over would only make the golem
+			// take it straight back on the next deposit.
+			if (stack.getItem() == Items.BONE_MEAL) {
+				continue;
+			}
+
 			// addItem mutates what it is given as well as returning the rest,
 			// so it gets a copy and the slot is rewritten from the result.
 			ItemStack rest = HopperBlockEntity.addItem(null, target, stack.copy(), null);
@@ -204,7 +211,38 @@ public class DepositGoal extends Goal {
 			}
 		}
 
+		this.restock(target);
 		return leftover;
+	}
+
+	// Restocking happens where the golem already stands, at the end of a deposit.
+	// SPEC.md forbids a dedicated trip to fetch bone meal, so an empty container
+	// simply means nothing happens.
+	private void restock(Container source) {
+		// With a single slot the bone meal would confiscate it and the golem
+		// could never carry a harvest again.
+		if (ArgilusConfig.get().inventorySize() < 2 || this.golem.boneMealSlot() >= 0) {
+			return;
+		}
+
+		for (int slot = 0; slot < source.getContainerSize(); slot++) {
+			ItemStack stack = source.getItem(slot);
+
+			if (stack.isEmpty() || stack.getItem() != Items.BONE_MEAL) {
+				continue;
+			}
+
+			ItemStack taken = source.removeItem(slot, stack.getCount());
+			ItemStack rest = this.golem.getInventory().addItem(taken);
+
+			if (!rest.isEmpty()) {
+				// Put back what did not fit rather than destroy it.
+				HopperBlockEntity.addItem(null, source, rest, null);
+			}
+
+			source.setChanged();
+			return;
+		}
 	}
 
 	private void closeContainer() {

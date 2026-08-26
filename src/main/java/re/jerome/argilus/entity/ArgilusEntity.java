@@ -1,7 +1,9 @@
 package re.jerome.argilus.entity;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.SimpleContainer;
@@ -19,6 +21,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.npc.InventoryCarrier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ChestBlock;
@@ -32,6 +35,7 @@ import re.jerome.argilus.ArgilusConfig;
 
 public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, ContainerUser {
 	private static final double CONTAINER_REACH = 3.0;
+	private static final int BONE_MEAL_SUPPRESSION = 1200;
 
 	private final SimpleContainer inventory = new SimpleContainer(ArgilusConfig.get().inventorySize());
 
@@ -43,6 +47,7 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 	private @Nullable BlockPos openedContainerPos;
 	private @Nullable BlockPos fieldCenter;
 	private int idleTicks;
+	private final Map<BlockPos, Long> boneMealSuppressed = new HashMap<>();
 
 	public ArgilusEntity(EntityType<? extends ArgilusEntity> type, Level level) {
 		super(type, level);
@@ -60,16 +65,43 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 	protected void registerGoals() {
 		this.goalSelector.addGoal(0, new FloatGoal(this));
 		this.goalSelector.addGoal(1, new DepositGoal(this));
-		this.goalSelector.addGoal(2, new HarvestCropGoal(this));
-		this.goalSelector.addGoal(3, new TillSoilGoal(this));
-		this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 0.6));
-		this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 6.0F));
-		this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(2, new BoneMealGoal(this));
+		this.goalSelector.addGoal(3, new HarvestCropGoal(this));
+		this.goalSelector.addGoal(4, new TillSoilGoal(this));
+		this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 0.6));
+		this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
 	}
 
 	@Override
 	public SimpleContainer getInventory() {
 		return this.inventory;
+	}
+
+	// Bone meal never leaves the golem at a deposit, so it permanently occupies
+	// one slot. That is the slot SPEC.md asks to reserve, without the second
+	// container and second NBT entry a hard index would cost.
+	// A crop the golem just replanted is age 0, so it would be an obvious bone
+	// meal target the instant it is planted: feed, ripen, harvest, replant, feed
+	// again, forever on one tile. Harvesting parks the tile here instead, long
+	// enough for the golem to work the rest of the field first.
+	public void suppressBoneMeal(BlockPos pos, long now) {
+		this.boneMealSuppressed.put(pos, now + BONE_MEAL_SUPPRESSION);
+	}
+
+	public boolean isBoneMealSuppressed(BlockPos pos, long now) {
+		this.boneMealSuppressed.values().removeIf(until -> until <= now);
+		return this.boneMealSuppressed.containsKey(pos);
+	}
+
+	public int boneMealSlot() {
+		for (int slot = 0; slot < this.inventory.getContainerSize(); slot++) {
+			if (this.inventory.getItem(slot).getItem() == Items.BONE_MEAL) {
+				return slot;
+			}
+		}
+
+		return -1;
 	}
 
 	public boolean isInventoryFull() {
