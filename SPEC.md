@@ -114,12 +114,36 @@ Objectif : marcher avec les mods de cultures (type Farmer's Delight) **sans
 dépendance dure**. La compat vient de l'approche générique, pas d'un code
 spécifique par mod.
 
-Limites connues à traiter ou à exclure explicitement :
+#### Résultats mesurés — Farmer's Delight Refabricated 26.2-3.6.17
 
-- Cultures multi-blocs ou aquatiques (le riz de Farmer's Delight) — hors cas
-  générique.
-- Cultures à récolte par clic droit avec repousse partielle (les tomates) — le
-  golem ne les gère pas en v1.
+Testé en jeu. Le résolveur générique n'a demandé **aucun ajustement**.
+
+| Culture | Bloc | Comportement |
+| --- | --- | --- |
+| Chou | `CabbageBlock extends CropBlock` | récolté et replanté ✅ |
+| Oignon | `OnionBlock extends CropBlock` | récolté et replanté ✅ |
+| Riz | `RicePaniclesBlock extends CropBlock` | récolté et replanté ✅ |
+| Tomate | `TomatoBlock extends CropBlock` | récolté, **jamais replanté** ⚠️ |
+
+La poudre d'os fonctionne sur les quatre, qui implémentent `BonemealableBlock`.
+
+Deux suppositions de cette spec étaient fausses :
+
+- **Le riz n'est pas hors cas générique.** Le golem casse les panicules, la
+  moitié haute qui est une `CropBlock`, et laisse le pied `RiceBlock` intact. Le
+  plant repousse. Ça marche par construction, pas par chance : notre règle ne
+  cible que les `CropBlock` mûres, et le pied n'en est pas une.
+- **Les tomates ne sont pas hors de portée.** `TomatoBlock` étend `CropBlock`,
+  donc le golem les récolte bel et bien.
+
+**Limite assumée — les tomates s'épuisent.** Elles ne dropent pas de graine, il
+faut la fabriquer, donc la règle « la graine est le drop qui repose ce bloc » ne
+trouve rien et la case reste nue. Le joueur récupère ses tomates dans le coffre
+mais doit replanter à la main. Garder une tomateraie hors du rayon du golem, ou
+accepter de la replanter.
+
+Ne sont pas des `CropBlock` et restent donc invisibles au golem :
+`BuddingTomatoBlock`, `RiceBlock` et `WildRiceBlock`.
 
 **À vérifier avant de promettre quoi que ce soit :** que les mods visés soient
 effectivement portés en 26.2. Beaucoup sont encore bloqués en 1.21.x.
