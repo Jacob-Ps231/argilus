@@ -14,7 +14,7 @@ import re.jerome.argilus.entity.ArgilusEntity;
 public final class ModEntityTypes {
 	public static final EntityType<ArgilusEntity> ARGILUS = create(
 			"argilus",
-			EntityType.Builder.of(ArgilusEntity::new, MobCategory.MISC).sized(1.4F, 2.7F));
+			EntityType.Builder.of(ArgilusEntity::new, MobCategory.MISC).sized(0.49F, 0.98F).eyeHeight(0.8F));
 
 	private ModEntityTypes() {
 	}

@@ -1,32 +1,28 @@
 package re.jerome.argilus.client;
 
-import net.minecraft.client.model.animal.golem.IronGolemModel;
-import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
-import net.minecraft.client.renderer.entity.state.IronGolemRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.resources.Identifier;
 import re.jerome.argilus.Argilus;
 import re.jerome.argilus.entity.ArgilusEntity;
 
-// Placeholder skin: the vanilla iron golem mesh with a flat clay texture.
-// Step 7 replaces it with a Blockbench model and a model layer of our own.
-// IronGolemModel.setupAnim only reads primitives, so the render state's
-// golem-specific object fields can safely stay unset.
-public class ArgilusRenderer extends MobRenderer<ArgilusEntity, IronGolemRenderState, IronGolemModel> {
+// The golem needs no render state of its own: LivingEntityRenderState already
+// carries the walk animation and the head rotation, which is all the model reads.
+public class ArgilusRenderer extends MobRenderer<ArgilusEntity, LivingEntityRenderState, ArgilusModel> {
 	private static final Identifier TEXTURE = Argilus.id("textures/entity/argilus.png");
 
 	public ArgilusRenderer(EntityRendererProvider.Context context) {
-		super(context, new IronGolemModel(context.bakeLayer(ModelLayers.IRON_GOLEM)), 0.7F);
+		super(context, new ArgilusModel(context.bakeLayer(ArgilusClient.ARGILUS_LAYER)), 0.3F);
 	}
 
 	@Override
-	public IronGolemRenderState createRenderState() {
-		return new IronGolemRenderState();
+	public LivingEntityRenderState createRenderState() {
+		return new LivingEntityRenderState();
 	}
 
 	@Override
-	public Identifier getTextureLocation(IronGolemRenderState state) {
+	public Identifier getTextureLocation(LivingEntityRenderState state) {
 		return TEXTURE;
 	}
 }
