@@ -37,10 +37,22 @@ public class ArgilusModel extends EntityModel<LivingEntityRenderState> {
 		MeshDefinition mesh = new MeshDefinition();
 		PartDefinition root = mesh.getRoot();
 
-		root.addOrReplaceChild(
+		PartDefinition head = root.addOrReplaceChild(
 				PartNames.HEAD,
 				CubeListBuilder.create().texOffs(0, 0).addBox(-3.0F, -5.0F, -3.0F, 6.0F, 5.0F, 6.0F),
 				PartPose.offset(0.0F, 13.0F, 0.0F));
+
+		// Children of the head, so the hat follows it without any animation code
+		// of its own. Brim first, then the crown sitting on top of it.
+		head.addOrReplaceChild(
+				"hat_brim",
+				CubeListBuilder.create().texOffs(0, 44).addBox(-5.0F, -6.0F, -5.0F, 10.0F, 1.0F, 10.0F),
+				PartPose.ZERO);
+
+		head.addOrReplaceChild(
+				"hat_crown",
+				CubeListBuilder.create().texOffs(0, 32).addBox(-3.0F, -8.0F, -3.0F, 6.0F, 2.0F, 6.0F),
+				PartPose.ZERO);
 
 		root.addOrReplaceChild(
 				PartNames.BODY,
