@@ -16,6 +16,7 @@ bien faits.
 | ---------------------- | ------------------------------------------------- |
 | Nom du mob             | Argilus / Golem d'argile                          |
 | Taille du mob          | hitbox du golem de cuivre (0.49 × 0.98)           |
+| Apparence              | argile, chapeau de paille à bande rouge           |
 | Invocation             | citrouille sculptée **ou lanterne** sur un bloc d'argile |
 | Rayon d'action         | 12 blocs (config : 4 à 24)                        |
 | Cadence de récolte     | 1 bloc max toutes les 20 ticks (1 s)              |
@@ -242,6 +243,12 @@ encore :
   que le mixin de piétinement devient inutile avant de le supprimer.
 
 Le golem garde l'apparence du golem de fer entre les deux.
+
+Faite finalement sans Blockbench : la géométrie est déclarée en Java comme le
+fait le vanilla, et la texture est produite par `tools/GenArgilus.java`. Ce
+générateur est versionné parce qu'il est la source du PNG — le repeindre à la
+main reste possible, mais le fichier cesserait alors de décrire ce qui est sur
+le disque.
 
 ### Étape 8 — Passe de compatibilité
 
