@@ -20,7 +20,8 @@ bien faits.
 | Invocation             | citrouille sculptée **ou lanterne** sur un bloc d'argile |
 | Rayon d'action         | 12 blocs (config : 4 à 24)                        |
 | Cadence de récolte     | 1 bloc max toutes les 20 ticks (1 s)              |
-| Inventaire             | 9 slots                                           |
+| Inventaire             | 18 slots (config)                                 |
+| Ramassage au sol       | objets à portée, rayon 7 (config)                 |
 | Points de vie          | 20                                                |
 | Déclencheur de dépôt   | inventaire plein **ou** plus rien à faire depuis 100 ticks (inventaire non vide) |
 | Conteneur de dépôt     | le plus proche du centre du champ détecté, mémorisé |
@@ -104,7 +105,7 @@ en a.
 
 Il ne s'approvisionne **que pendant un dépôt**, en prélevant dans le conteneur ce
 qui s'y trouve. Jamais de trajet dédié à la recherche de poudre d'os. Un slot
-d'inventaire lui est réservé, il n'en reste donc que 8 pour la récolte.
+d'inventaire lui est réservé, il n'en reste donc que 17 pour la récolte.
 
 Sans effet sur les tiges de melon et de citrouille — comportement vanilla, ne pas
 chercher à le contourner.

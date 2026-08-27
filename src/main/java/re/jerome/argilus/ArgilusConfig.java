@@ -16,8 +16,9 @@ public record ArgilusConfig(
 		int harvestIntervalTicks,
 		int scanIntervalTicks,
 		int inventorySize,
-		int depositIdleTicks) {
-	private static final ArgilusConfig DEFAULTS = new ArgilusConfig(12, 20, 40, 9, 100);
+		int depositIdleTicks,
+		int collectRadius) {
+	private static final ArgilusConfig DEFAULTS = new ArgilusConfig(12, 20, 40, 18, 100, 7);
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	private static ArgilusConfig current = DEFAULTS;
@@ -53,7 +54,8 @@ public record ArgilusConfig(
 				bound(this.harvestIntervalTicks, 1, 200, DEFAULTS.harvestIntervalTicks),
 				bound(this.scanIntervalTicks, 20, 400, DEFAULTS.scanIntervalTicks),
 				bound(this.inventorySize, 1, 27, DEFAULTS.inventorySize),
-				bound(this.depositIdleTicks, 20, 2000, DEFAULTS.depositIdleTicks));
+				bound(this.depositIdleTicks, 20, 2000, DEFAULTS.depositIdleTicks),
+				bound(this.collectRadius, 1, 24, DEFAULTS.collectRadius));
 	}
 
 	private static int bound(int value, int min, int max, int fallback) {

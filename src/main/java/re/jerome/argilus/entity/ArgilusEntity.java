@@ -75,10 +75,11 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 		this.goalSelector.addGoal(1, new DepositGoal(this));
 		this.goalSelector.addGoal(2, new BoneMealGoal(this));
 		this.goalSelector.addGoal(3, new HarvestCropGoal(this));
-		this.goalSelector.addGoal(4, new TillSoilGoal(this));
-		this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 0.6));
-		this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
-		this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+		this.goalSelector.addGoal(4, new CollectItemsGoal(this));
+		this.goalSelector.addGoal(5, new TillSoilGoal(this));
+		this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.6));
+		this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 	}
 
 	@Override
