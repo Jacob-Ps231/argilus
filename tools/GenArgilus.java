@@ -58,15 +58,72 @@ public class GenArgilus {
 		new Finish("mossy", 0xA4A8B8, 0x8B90A2, 0xB8BCCA, 0x6E8C3A, "moss"),
 	};
 
+	// Spawn eggs stopped being a tinted generic template: since 1.21 each one is
+	// its own drawing, so ours is a hand placed 16x16 rather than two colours.
+	// Legend: K outline, L C D clay light to dark, S T U straw light to dark,
+	// R band, dot transparent.
+	static final String[] SPAWN_EGG = {
+		"................",
+		".....KKKKKK.....",
+		"....KSSTTUK.....",
+		"....KSTTUUK.....",
+		"...KKRRRRRKK....",
+		"..KTTTTTTTTTK...",
+		".KTSTUTTSTUTTK..",
+		".KKKKKKKKKKKKK..",
+		"....KLCCCCK.....",
+		"...KLCKCCKCK....",
+		"...KLCCCCCCK....",
+		"...KLCCCCCCK....",
+		"...KLCCCCCDK....",
+		"....KLCCCDK.....",
+		".....KKKKKK.....",
+		"................",
+	};
+
 	public static void main(String[] args) throws Exception {
-		File directory = new File(args[0]);
+		File textures = new File(args[0]);
+		File entity = new File(textures, "entity");
+		File item = new File(textures, "item");
 
 		for (Finish finish : FINISHES) {
 			BufferedImage image = paint(finish);
-			File out = new File(directory, "argilus_" + finish.name() + ".png");
+			File out = new File(entity, "argilus_" + finish.name() + ".png");
 			ImageIO.write(image, "PNG", out);
 			System.out.println("ecrit : " + out.getName() + " (" + out.length() + " o)");
 		}
+
+		File egg = new File(item, "argilus_spawn_egg.png");
+		ImageIO.write(paintSpawnEgg(), "PNG", egg);
+		System.out.println("ecrit : " + egg.getName() + " (" + egg.length() + " o)");
+	}
+
+	static BufferedImage paintSpawnEgg() {
+		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+
+		for (int y = 0; y < 16; y++) {
+			String row = SPAWN_EGG[y];
+
+			for (int x = 0; x < 16; x++) {
+				int rgb = switch (row.charAt(x)) {
+					case 'K' -> 0x1D1D21;
+					case 'L' -> 0xB8BCCA;
+					case 'C' -> 0xA4A8B8;
+					case 'D' -> 0x8B90A2;
+					case 'S' -> 0xDCBC6A;
+					case 'T' -> 0xC7A44E;
+					case 'U' -> 0xA8873C;
+					case 'R' -> 0x8B3A2E;
+					default -> -1;
+				};
+
+				if (rgb >= 0) {
+					set(image, x, y, rgb);
+				}
+			}
+		}
+
+		return image;
 	}
 
 	static BufferedImage paint(Finish finish) {
