@@ -52,6 +52,10 @@ public final class ArgilusSummon {
 		// copper golem this one is tall, and the head slot is the top of it.
 		BlockPos feet = match.getBlock(0, 1, 0).getPos();
 
+		// EntityType.create does not call finalizeSpawn, so the pattern path has
+		// to draw its own finish or every summoned golem would look the same.
+		golem.randomiseVariant();
+
 		CarvedPumpkinBlock.clearPatternBlocks(level, match);
 		golem.snapTo(feet.getX() + 0.5, feet.getY() + 0.05, feet.getZ() + 0.5, 0.0F, 0.0F);
 		level.addFreshEntity(golem);

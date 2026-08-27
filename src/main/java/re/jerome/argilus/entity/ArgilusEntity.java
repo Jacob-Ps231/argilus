@@ -5,11 +5,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.ContainerUser;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
@@ -25,6 +31,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
@@ -44,6 +51,11 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 	// Borrowed from the clay block until the golem gets sounds of its own, read
 	// from the block rather than hardcoded so it follows any vanilla change.
 	private static final SoundType CLAY = Blocks.CLAY.defaultBlockState().getSoundType();
+
+	// Rendering happens on the client, so the finish has to be synched rather
+	// than kept in a plain field, which would never leave the server.
+	private static final EntityDataAccessor<Integer> VARIANT =
+			SynchedEntityData.defineId(ArgilusEntity.class, EntityDataSerializers.INT);
 
 	private final SimpleContainer inventory = new SimpleContainer(ArgilusConfig.get().inventorySize());
 
@@ -67,6 +79,36 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 				.add(Attributes.MOVEMENT_SPEED, 0.25)
 				.add(Attributes.KNOCKBACK_RESISTANCE, 1.0)
 				.add(Attributes.STEP_HEIGHT, 1.0);
+	}
+
+	@Override
+	protected void defineSynchedData(SynchedEntityData.Builder builder) {
+		super.defineSynchedData(builder);
+		builder.define(VARIANT, ArgilusVariant.SMOOTH.ordinal());
+	}
+
+	public ArgilusVariant getVariant() {
+		return ArgilusVariant.byId(this.entityData.get(VARIANT));
+	}
+
+	public void setVariant(ArgilusVariant variant) {
+		this.entityData.set(VARIANT, variant.ordinal());
+	}
+
+	public void randomiseVariant() {
+		this.setVariant(ArgilusVariant.random(this.getRandom()));
+	}
+
+	// Covers the spawn egg. The clay pattern goes through EntityType.create and
+	// never reaches here, so ArgilusSummon draws its own.
+	@Override
+	public SpawnGroupData finalizeSpawn(
+			ServerLevelAccessor level,
+			DifficultyInstance difficulty,
+			EntitySpawnReason reason,
+			SpawnGroupData group) {
+		this.randomiseVariant();
+		return super.finalizeSpawn(level, difficulty, reason, group);
 	}
 
 	@Override
@@ -214,12 +256,14 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 		super.addAdditionalSaveData(output);
 		this.writeInventoryToTag(output);
 		output.storeNullable("deposit_pos", BlockPos.CODEC, this.depositPos);
+		output.putString("variant", this.getVariant().getName());
 	}
 
 	@Override
 	protected void readAdditionalSaveData(ValueInput input) {
 		super.readAdditionalSaveData(input);
 		this.depositPos = input.read("deposit_pos", BlockPos.CODEC).orElse(null);
+		this.setVariant(ArgilusVariant.byName(input.getStringOr("variant", ArgilusVariant.SMOOTH.getName())));
 
 		// Not readInventoryFromTag: it funnels through SimpleContainer.addItem,
 		// which silently drops whatever no longer fits once the configured size

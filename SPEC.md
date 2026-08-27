@@ -16,7 +16,7 @@ bien faits.
 | ---------------------- | ------------------------------------------------- |
 | Nom du mob             | Argilus / Golem d'argile                          |
 | Taille du mob          | hitbox du golem de cuivre (0.49 × 0.98)           |
-| Apparence              | argile, chapeau de paille à bande rouge           |
+| Apparence              | chapeau de paille à bande rouge, 6 finitions d'argile tirées au sort |
 | Invocation             | citrouille sculptée **ou lanterne** sur un bloc d'argile |
 | Rayon d'action         | 12 blocs (config : 4 à 24)                        |
 | Cadence de récolte     | 1 bloc max toutes les 20 ticks (1 s)              |
