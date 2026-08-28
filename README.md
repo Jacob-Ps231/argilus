@@ -74,6 +74,13 @@ Minecraft 26.2, Fabric Loader 0.19.3 or later, Fabric API, Java 25.
 Chests, trapped chests and barrels, through the `argilus:deposit_containers`
 block tag. A datapack can widen it without touching the mod.
 
+## Bugs and sources
+
+Report anything odd at
+[github.com/Jacob-Ps231/argilus/issues](https://github.com/Jacob-Ps231/argilus/issues).
+A description of what the golem did, and what you expected instead, is usually
+enough — most of the behaviour above was corrected that way.
+
 ## Licence
 
 MIT.

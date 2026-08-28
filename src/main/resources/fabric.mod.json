@@ -9,6 +9,11 @@
 	],
 	"license": "MIT",
 	"icon": "assets/argilus/icon.png",
+	"contact": {
+		"homepage": "https://github.com/Jacob-Ps231/argilus",
+		"sources": "https://github.com/Jacob-Ps231/argilus",
+		"issues": "https://github.com/Jacob-Ps231/argilus/issues"
+	},
 	"environment": "*",
 	"entrypoints": {
 		"main": [
