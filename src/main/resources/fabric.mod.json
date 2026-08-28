@@ -8,6 +8,7 @@
 		"Jerome"
 	],
 	"license": "MIT",
+	"icon": "assets/argilus/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [

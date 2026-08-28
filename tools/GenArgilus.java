@@ -1,12 +1,12 @@
-// Source of the entity textures in assets/argilus/textures/entity/, kept in the
-// repository because a generated file whose generator is lost stops being
-// editable.
+// Source of every image in the mod, kept in the repository because a generated
+// file whose generator is lost stops being editable.
 //
-// Run it with the single file launcher, no build needed:
-//   java tools/GenArgilus.java src/main/resources/assets/argilus/textures/entity
+// Run it from the project root with the single file launcher, no build needed:
+//   java tools/GenArgilus.java .
 //
-// It writes one png per ArgilusVariant, named after it. Add a Finish below and
-// a constant to that enum and the pair stays in step.
+// It writes one entity texture per ArgilusVariant, the spawn egg, and the icon
+// in both sizes. Add a Finish below and a constant to that enum together, or
+// the pair falls out of step and a variant renders with a missing texture.
 //
 // The regions are dictated by the texOffs values in ArgilusModel: change one and
 // the other has to follow. Unwrapping a box lays its four side faces in a single
@@ -81,10 +81,38 @@ public class GenArgilus {
 		"................",
 	};
 
+	// The golem head rather than the egg, since an icon reads better as a face.
+	static final String[] ICON = {
+		"................",
+		"................",
+		".....KKKKKK.....",
+		"....KSSTTUK.....",
+		"...KKRRRRRKK....",
+		"..KTTTTTTTTTK...",
+		".KTSTUTTSTUTTK..",
+		".KKKKKKKKKKKKK..",
+		"....KLCCCCCK....",
+		"....KCKCCKCK....",
+		"....KCCCCCCK....",
+		"....KCCCCCDK....",
+		"....KCCCCCDK....",
+		"....KKKKKKKK....",
+		"................",
+		"................",
+	};
+
 	public static void main(String[] args) throws Exception {
-		File textures = new File(args[0]);
+		File root = new File(args[0]);
+		File textures = new File(root, "src/main/resources/assets/argilus/textures");
 		File entity = new File(textures, "entity");
 		File item = new File(textures, "item");
+
+		// 128 for the in game mod list, 512 for a store page, both scaled with
+		// nearest neighbour so the pixels stay hard instead of turning to mush.
+		ImageIO.write(scale(paintMap(ICON), 8), "PNG",
+				new File(root, "src/main/resources/assets/argilus/icon.png"));
+		ImageIO.write(scale(paintMap(ICON), 32), "PNG", new File(root, "icon.png"));
+		System.out.println("ecrit : icon.png (128 et 512)");
 
 		for (Finish finish : FINISHES) {
 			BufferedImage image = paint(finish);
@@ -98,11 +126,28 @@ public class GenArgilus {
 		System.out.println("ecrit : " + egg.getName() + " (" + egg.length() + " o)");
 	}
 
+	static BufferedImage scale(BufferedImage source, int factor) {
+		int size = source.getWidth() * factor;
+		BufferedImage scaled = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+
+		for (int y = 0; y < size; y++) {
+			for (int x = 0; x < size; x++) {
+				scaled.setRGB(x, y, source.getRGB(x / factor, y / factor));
+			}
+		}
+
+		return scaled;
+	}
+
 	static BufferedImage paintSpawnEgg() {
+		return paintMap(SPAWN_EGG);
+	}
+
+	static BufferedImage paintMap(String[] map) {
 		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
 
 		for (int y = 0; y < 16; y++) {
-			String row = SPAWN_EGG[y];
+			String row = map[y];
 
 			for (int x = 0; x < 16; x++) {
 				int rgb = switch (row.charAt(x)) {
