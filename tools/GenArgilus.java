@@ -1,16 +1,16 @@
-// Source of every image in the mod, kept in the repository because a generated
+// Source of the six entity textures, kept in the repository because a generated
 // file whose generator is lost stops being editable.
 //
 // Run it from the project root with the single file launcher, no build needed:
 //   java tools/GenArgilus.java .
 //
-// It writes one entity texture per ArgilusVariant and the spawn egg. Add a
-// Finish below and a constant to that enum together, or the pair falls out of
-// step and a variant renders with a missing texture.
+// One texture per ArgilusVariant. Add a Finish below and a constant to that enum
+// together, or the pair falls out of step and a variant renders with a missing
+// texture.
 //
-// It deliberately does NOT touch icon.png or assets/argilus/icon.png. Those are
-// hand drawn artwork now, and generating them here would silently overwrite the
-// artwork on the next run.
+// It deliberately writes nothing else. The mod icon and the spawn egg are drawn
+// artwork now, and generating them here would silently overwrite that artwork on
+// the next run: the mirror image of the problem this file exists to prevent.
 //
 // The regions are dictated by the texOffs values in ArgilusModel: change one and
 // the other has to follow. Unwrapping a box lays its four side faces in a single
@@ -62,34 +62,10 @@ public class GenArgilus {
 		new Finish("mossy", 0xA4A8B8, 0x8B90A2, 0xB8BCCA, 0x6E8C3A, "moss"),
 	};
 
-	// Spawn eggs stopped being a tinted generic template: since 1.21 each one is
-	// its own drawing, so ours is a hand placed 16x16 rather than two colours.
-	// Legend: K outline, L C D clay light to dark, S T U straw light to dark,
-	// R band, dot transparent.
-	static final String[] SPAWN_EGG = {
-		"................",
-		".....KKKKKK.....",
-		"....KSSTTUK.....",
-		"....KSTTUUK.....",
-		"...KKRRRRRKK....",
-		"..KTTTTTTTTTK...",
-		".KTSTUTTSTUTTK..",
-		".KKKKKKKKKKKKK..",
-		"....KLCCCCK.....",
-		"...KLCKCCKCK....",
-		"...KLCCCCCCK....",
-		"...KLCCCCCCK....",
-		"...KLCCCCCDK....",
-		"....KLCCCDK.....",
-		".....KKKKKK.....",
-		"................",
-	};
-
 	public static void main(String[] args) throws Exception {
 		File root = new File(args[0]);
 		File textures = new File(root, "src/main/resources/assets/argilus/textures");
 		File entity = new File(textures, "entity");
-		File item = new File(textures, "item");
 
 		for (Finish finish : FINISHES) {
 			BufferedImage image = paint(finish);
@@ -97,42 +73,6 @@ public class GenArgilus {
 			ImageIO.write(image, "PNG", out);
 			System.out.println("ecrit : " + out.getName() + " (" + out.length() + " o)");
 		}
-
-		File egg = new File(item, "argilus_spawn_egg.png");
-		ImageIO.write(paintSpawnEgg(), "PNG", egg);
-		System.out.println("ecrit : " + egg.getName() + " (" + egg.length() + " o)");
-	}
-
-	static BufferedImage paintSpawnEgg() {
-		return paintMap(SPAWN_EGG);
-	}
-
-	static BufferedImage paintMap(String[] map) {
-		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-
-		for (int y = 0; y < 16; y++) {
-			String row = map[y];
-
-			for (int x = 0; x < 16; x++) {
-				int rgb = switch (row.charAt(x)) {
-					case 'K' -> 0x1D1D21;
-					case 'L' -> 0xB8BCCA;
-					case 'C' -> 0xA4A8B8;
-					case 'D' -> 0x8B90A2;
-					case 'S' -> 0xDCBC6A;
-					case 'T' -> 0xC7A44E;
-					case 'U' -> 0xA8873C;
-					case 'R' -> 0x8B3A2E;
-					default -> -1;
-				};
-
-				if (rgb >= 0) {
-					set(image, x, y, rgb);
-				}
-			}
-		}
-
-		return image;
 	}
 
 	static BufferedImage paint(Finish finish) {
