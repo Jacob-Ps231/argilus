@@ -22,14 +22,25 @@ Each golem is summoned with one of six clay finishes, drawn at random.
 | --- | --- |
 | Harvest | any fully grown crop within its radius |
 | Replant | using a seed taken from the crop's own drops |
-| Pumpkins and melons | only fruit attached to a stem, melons whole rather than sliced |
+| Pumpkins and melons | only fruit attached to a stem, and melons in slices, as a bare hand gets them |
+| Sweet berries | picked without breaking the bush, which regrows as usual |
+| Nether wart | harvested and replanted like any crop, on anything that supports it |
 | Collect | walks to items dropped nearby and picks them up |
 | Deposit | into a chest or barrel it remembers, moving on to another when one fills |
-| Till | bare dirt beside farmland, but only when it has a seed to sow at once |
+| Sow | bare ground beside a tile already in production, and only with a seed to hand |
 | Bone meal | taken from the chest during a deposit, never on a trip of its own |
 
-It never tramples farmland, and it works whether or not a player is nearby, as
-long as the chunks are loaded.
+Right click it to open its inventory. Anything can be taken out or put in, which
+is the quickest way to hand it bone meal or a stack of seeds.
+
+It never tramples farmland, it never despawns, and it works whether or not a
+player is nearby, as long as the chunks are loaded. Berry bushes and cacti do
+not hurt it, so it can walk into a patch and clear the middle of it. Killing one
+returns everything it was carrying, plus a little clay.
+
+Ground it will prepare: dirt beside farmland, tilled and sown in one action, and
+anything in `#minecraft:supports_nether_wart` beside a tile already carrying
+wart. It leaves the tiles a melon or pumpkin stem needs for its fruit alone.
 
 ## Configuration
 
@@ -41,12 +52,13 @@ mistake cannot make the golem scan a huge volume every tick.
 | `radius` | 12 | 4 to 24 |
 | `harvestIntervalTicks` | 20 | 1 to 200 |
 | `scanIntervalTicks` | 40 | 20 to 400 |
-| `inventorySize` | 18 | 1 to 27 |
+| `inventoryRows` | 2 | 1 to 3 |
 | `depositIdleTicks` | 100 | 20 to 2000 |
 | `collectRadius` | 7 | 1 to 24 |
 
-Shrinking `inventorySize` while a golem is carrying more than fits drops the
-surplus at its feet rather than destroying it.
+The inventory is counted in rows of nine because that is what the screen behind
+the right click can display. Shrinking it while a golem is carrying more than
+fits drops the surplus at its feet rather than destroying it.
 
 ## Modded crops
 
@@ -62,8 +74,10 @@ harvests it and leaves the tile bare. Farmer's Delight tomatoes are the case in
 point, since their seeds have to be crafted. Keep such a patch outside the
 radius, or replant it by hand.
 
-Crops that are not `CropBlock` are invisible to the golem, which is the right
-outcome for anything the generic rule cannot handle.
+Sweet berry bushes and nether wart are matched the same way, by block type, so a
+modded plant extending either is handled too. Anything outside those three
+families is invisible to the golem, which is the right outcome for what the
+generic rule cannot handle.
 
 ## Requirements
 

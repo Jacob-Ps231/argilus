@@ -9,10 +9,15 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Containers;
 import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.ContainerUser;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.SpawnGroupData;
@@ -28,6 +33,8 @@ import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.npc.InventoryCarrier;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -39,6 +46,8 @@ import net.minecraft.world.level.block.entity.ContainerOpenersCounter;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import org.jspecify.annotations.Nullable;
@@ -57,7 +66,19 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 	private static final EntityDataAccessor<Integer> VARIANT =
 			SynchedEntityData.defineId(ArgilusEntity.class, EntityDataSerializers.INT);
 
-	private final SimpleContainer inventory = new SimpleContainer(ArgilusConfig.get().inventorySize());
+	// Subclassed for one answer. A bare SimpleContainer says every player may
+	// keep using it, forever: the screen would stay open and workable from
+	// across the map, and outlive the golem's death. Vanilla's chest boat
+	// answers with reach and aliveness, and so does this.
+	private final SimpleContainer inventory =
+			new SimpleContainer(ArgilusConfig.get().inventoryRows() * 9) {
+				@Override
+				public boolean stillValid(Player player) {
+					return !ArgilusEntity.this.isRemoved()
+							&& player.isWithinEntityInteractionRange(
+									ArgilusEntity.this.getBoundingBox(), CONTAINER_REACH);
+				}
+			};
 
 	// Stacks that no longer fit after the configured size shrank. The entity is
 	// not in the world when save data is read, so they wait for the first tick.
@@ -71,6 +92,17 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 
 	public ArgilusEntity(EntityType<? extends ArgilusEntity> type, Level level) {
 		super(type, level);
+
+		// A berry bush is PathType.DAMAGING, which the navigator refuses to enter
+		// at all, and every tile beside one is DAMAGING_IN_NEIGHBOR at a malus of
+		// eight. Left at that, a berry patch is a wall: the golem cannot reach
+		// the bushes in the middle of it, only the ones on the edge.
+		//
+		// Cacti share DAMAGING, and there is no per-block malus, so opening one
+		// opens the other. That is why the golem is made proof against both
+		// below rather than against berries alone.
+		this.setPathfindingMalus(PathType.DAMAGING, 0.0F);
+		this.setPathfindingMalus(PathType.DAMAGING_IN_NEIGHBOR, 0.0F);
 	}
 
 	public static AttributeSupplier.Builder createAttributes() {
@@ -118,7 +150,7 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 		this.goalSelector.addGoal(2, new BoneMealGoal(this));
 		this.goalSelector.addGoal(3, new HarvestCropGoal(this));
 		this.goalSelector.addGoal(4, new CollectItemsGoal(this));
-		this.goalSelector.addGoal(5, new TillSoilGoal(this));
+		this.goalSelector.addGoal(5, new SowGoal(this));
 		this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.6));
 		this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 6.0F));
 		this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
@@ -127,6 +159,56 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 	@Override
 	public SimpleContainer getInventory() {
 		return this.inventory;
+	}
+
+	// A farm keeps working while its owner is away, so the golem must survive
+	// the owner walking off to mine. Mob.checkDespawn deletes anything past the
+	// category's despawn distance that answers yes here, which is what emptied a
+	// fenced pen with nobody near it. Answering in code rather than setting the
+	// persistence flag at summon time also rescues the golems already placed,
+	// since that flag comes back from the save file.
+	@Override
+	public boolean removeWhenFarAway(double distance) {
+		return false;
+	}
+
+	// The counterpart to clearing the DAMAGING malus. The golem now walks
+	// straight through berry patches, and would walk into cacti given the
+	// chance, so both have to stop hurting it. It has no regeneration of any
+	// kind and works unattended for hours: a point of damage per step would be
+	// a slow death sentence for doing its job.
+	@Override
+	public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+		return source.is(DamageTypes.SWEET_BERRY_BUSH)
+				|| source.is(DamageTypes.CACTUS)
+				|| super.isInvulnerableTo(level, source);
+	}
+
+	// Right click opens the same screen a chest of this size would, sharing the
+	// golem's own container. Handing over write access as well as read is what
+	// makes it useful: bone meal and seeds can be loaded straight into the
+	// golem instead of being routed through its deposit chest.
+	@Override
+	protected InteractionResult mobInteract(Player player, InteractionHand hand) {
+		int rows = this.inventory.getContainerSize() / 9;
+
+		// No side check: Player.openMenu is a no-op on the client and the real
+		// one lives on ServerPlayer, which is how vanilla splits it too.
+		player.openMenu(new SimpleMenuProvider(
+				(id, playerInventory, opener) ->
+						new ChestMenu(menuTypeForRows(rows), id, playerInventory, this.inventory, rows),
+				this.getDisplayName()));
+
+		this.gameEvent(GameEvent.CONTAINER_OPEN, player);
+		return InteractionResult.SUCCESS;
+	}
+
+	private static MenuType<ChestMenu> menuTypeForRows(int rows) {
+		return switch (rows) {
+			case 1 -> MenuType.GENERIC_9x1;
+			case 3 -> MenuType.GENERIC_9x3;
+			default -> MenuType.GENERIC_9x2;
+		};
 	}
 
 	// Bone meal never leaves the golem at a deposit, so it permanently occupies
@@ -249,6 +331,17 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 		} else {
 			this.idleTicks++;
 		}
+	}
+
+	// Nothing does this by default. InventoryCarrier carries no drop code at
+	// all, so a mob that stays silent here takes its cargo to the grave the way
+	// a villager does. The clay on top is what the golem was made of, in the
+	// spirit of the iron golem returning some of its ingots.
+	@Override
+	protected void dropEquipment(ServerLevel level) {
+		super.dropEquipment(level);
+		Containers.dropContents(level, this, this.inventory);
+		this.spawnAtLocation(level, new ItemStack(Items.CLAY_BALL, 1 + this.random.nextInt(2)));
 	}
 
 	@Override

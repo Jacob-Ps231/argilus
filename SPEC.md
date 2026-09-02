@@ -20,15 +20,15 @@ bien faits.
 | Invocation             | citrouille sculptée **ou lanterne** sur un bloc d'argile |
 | Rayon d'action         | 12 blocs (config : 4 à 24)                        |
 | Cadence de récolte     | 1 bloc max toutes les 20 ticks (1 s)              |
-| Inventaire             | 18 slots (config)                                 |
+| Inventaire             | 2 rangées de 9 (config), ouvert au clic droit      |
 | Ramassage au sol       | objets à portée, rayon 7 (config)                 |
-| Points de vie          | 20                                                |
+| Points de vie          | 20, jamais de despawn                             |
 | Déclencheur de dépôt   | inventaire plein **ou** plus rien à faire depuis 100 ticks (inventaire non vide) |
 | Conteneur de dépôt     | le plus proche du centre du champ détecté, mémorisé |
-| Cultures gérées        | toute `CropBlock` mûre (vanilla et moddée) + citrouilles/melons |
+| Cultures gérées        | toute `CropBlock` mûre (vanilla et moddée), citrouilles/melons, baies douces, nether wart |
 | Labourage              | par adjacence à de la terre labourée, si une graine est disponible |
 | Poudre d'os            | prélevée dans le conteneur pendant un dépôt, 1 slot réservé |
-| Melons                 | récoltés entiers (contexte de loot « toucher de soie ») |
+| Melons                 | récoltés en tranches, comme à mains nues |
 
 ### Invocation — détail
 
@@ -49,7 +49,7 @@ Le second cas est le plus souvent oublié dans les implémentations maison.
 La détection de pattern du golem de cuivre est la référence à lire — structure
 identique, seul le bloc de base change.
 
-### Récolte — trois familles distinctes
+### Récolte — familles distinctes
 
 **1. Cultures classiques** (`CropBlock` avec un âge)
 
@@ -71,12 +71,43 @@ une tige attachée qui pointe vers lui**. Sans ça, le golem démonte les
 citrouilles décoratives et les têtes de golems de neige du joueur. Ne jamais
 casser la tige elle-même.
 
-Récolte avec un **contexte de loot « toucher de soie »** : le melon est récupéré
-en bloc entier, pas en tranches. Cette approche généralise aux fruits moddés,
-contrairement à un ajout d'item en dur. La citrouille tombe déjà entière en
-vanilla, elle n'est pas affectée.
+Récolte **à mains nues** : le melon donne des tranches, exactement ce qu'obtient
+un joueur. Le contexte de loot « toucher de soie » d'abord retenu ramassait le
+bloc entier — de la valeur créée à partir de rien, revenue après test en partie
+réelle. La citrouille tombe entière en vanilla, elle n'est pas affectée.
 
-**3. Labourage par adjacence**
+**3. Baies douces**
+
+Le buisson n'est jamais cassé : à partir de l'âge 2, il est cueilli et retombe à
+l'âge 1, comme au clic droit du joueur. Pas de replantation — le buisson est
+toujours debout — et pas de plantation de nouveaux buissons, décision explicite
+pour que le golem ne colonise pas le terrain.
+
+26.2 range ce rendement dans une table de loot dédiée
+(`harvest/sweet_berry_bush`), donc aucune quantité n'est écrite en dur.
+
+Le buisson est de type `PathType.DAMAGING`, malus -1 : le navigateur refuse d'y
+entrer. Une baie au milieu d'un carré de baies devient alors inatteignable, le
+golem ne récolte que le pourtour — constaté en jeu. Les deux malus,
+`DAMAGING` et `DAMAGING_IN_NEIGHBOR`, sont donc ramenés à 0.
+
+**Les cactus partagent `DAMAGING`** et il n'existe pas de malus par bloc :
+ouvrir les baies ouvre les cactus. Le golem est donc rendu insensible aux deux
+types de dégâts, sans quoi un golem en désert finirait par mourir contre un
+cactus. Il peut toujours s'y bloquer physiquement — le cactus a une collision —
+mais le goal abandonne une cible qu'il n'atteint pas.
+
+**4. Nether wart**
+
+`NetherWartBlock` n'est pas une `CropBlock`, mais son drop est le `BlockItem`
+qui repose le bloc : la règle générique de replantation s'applique sans
+adaptation. Pas de poudre d'os, le bloc n'est pas `BonemealableBlock`.
+
+Semis par adjacence, sur ce que `#minecraft:supports_nether_wart` autorise
+plutôt que sur le sable des âmes nommé en dur. Pas besoin du garde-fou du
+labourage : ce support ne s'assèche pas.
+
+**5. Labourage par adjacence**
 
 Pas de mémoire NBT. Règle unique : une position est labourable si c'est de la
 **terre nue adjacente à de la terre labourée**, dans le rayon.
@@ -94,11 +125,19 @@ Exclusions : bloc d'herbe, terre stérile, podzol, mycélium, terre enracinée. 
 terre stérile est le piège : la houe la transforme en terre normale, pas en terre
 labourée.
 
+**Exclusion supplémentaire, découverte en partie réelle : les emplacements de
+fruits.** Une tige fait pousser son melon sur une case voisine, posée sur la
+terre en dessous. Cette terre est nue et collée à de la terre labourée, donc la
+règle d'adjacence la prend — le golem laboure, sème, et la tige n'a plus jamais
+où pousser. Une case dont le **dessus** est voisin d'une tige est donc refusée.
+Les deux types de tige comptent : une tige attachée redevient libre dès que son
+fruit est cueilli, et peut alors viser n'importe quelle direction.
+
 *Limite assumée :* si la totalité du champ est piétinée, plus aucune case
 labourée n'amorce la règle et le golem s'arrête. Le joueur relaboure une case à
 la main. Cas rare, non traité.
 
-**4. Poudre d'os**
+**6. Poudre d'os**
 
 Le golem applique de la poudre d'os sur les cultures non mûres de son rayon, s'il
 en a.
@@ -149,6 +188,33 @@ Ne sont pas des `CropBlock` et restent donc invisibles au golem :
 
 **À vérifier avant de promettre quoi que ce soit :** que les mods visés soient
 effectivement portés en 26.2. Beaucoup sont encore bloqués en 1.21.x.
+
+### Survie et inventaire visible
+
+Ajoutés après le premier test en partie réelle.
+
+**Jamais de despawn.** `Mob.checkDespawn` supprime toute entité au-delà de la
+distance de despawn de sa catégorie qui répond oui à `removeWhenFarAway`. Un
+golem posé dans un enclos disparaissait pendant que le joueur minait. La réponse
+est donnée en code plutôt qu'en posant le drapeau de persistance à l'invocation :
+ce drapeau revient de la sauvegarde, donc les golems déjà placés resteraient
+condamnés.
+
+**Inventaire au clic droit**, en dépôt et retrait libres — c'est le chemin le
+plus court pour lui donner de la poudre d'os. L'écran est un coffre vanilla, qui
+n'existe qu'en rangées de neuf : la config compte donc des rangées et non des
+slots.
+
+Le `SimpleContainer` est sous-classé pour une seule réponse. Le sien dit oui à
+tout le monde, indéfiniment : l'écran resterait ouvert et utilisable à l'autre
+bout de la carte, et survivrait à la mort du golem. Il répond désormais par la
+portée et l'existence, comme le bateau à coffre vanilla.
+
+**Butin à la mort** : tout l'inventaire, plus une ou deux boules d'argile. Rien
+ne le fait par défaut — `InventoryCarrier` ne contient aucun code de drop, et un
+mob qui ne surcharge pas `dropEquipment` emporte sa cargaison, comme le
+villageois. Le cheval à coffre est le contre-exemple, il surcharge
+explicitement.
 
 ### Comportements repris du golem de cuivre
 

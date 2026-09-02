@@ -5,21 +5,26 @@ import java.util.EnumSet;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.NetherWartBlock;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.storage.loot.BuiltInLootTables;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import re.jerome.argilus.ArgilusConfig;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
@@ -33,6 +38,11 @@ import re.jerome.argilus.ArgilusConfig;
 // But an attached stem only exists while its fruit does, so whatever it points
 // at is its fruit by construction. Decorative pumpkins have no stem aimed at
 // them and are therefore invisible to the golem.
+//
+// Nether wart and sweet berry bushes are matched by block type for the same
+// reason CropBlock is: a modded block extending either one is handled without
+// this goal knowing it exists. Neither belongs to a usable vanilla tag, since
+// #minecraft:crops holds neither.
 public class HarvestCropGoal extends Goal {
 	private static final int VERTICAL_REACH = 2;
 	private static final double HARVEST_REACH = 2.5;
@@ -43,7 +53,6 @@ public class HarvestCropGoal extends Goal {
 	private BlockPos target;
 	private long nextScanTime;
 	private long nextHarvestTime;
-	private ItemStack silkTouch;
 
 	public HarvestCropGoal(ArgilusEntity golem) {
 		this.golem = golem;
@@ -134,13 +143,23 @@ public class HarvestCropGoal extends Goal {
 		BlockState state = level.getBlockState(pos);
 
 		if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
-			this.harvestCrop(level, pos, state, crop);
+			this.harvestSown(level, pos, state, crop.getStateForAge(0), SoundEvents.CROP_PLANTED);
+		} else if (isRipeWart(state)) {
+			this.harvestSown(
+					level, pos, state,
+					Blocks.NETHER_WART.defaultBlockState(), SoundEvents.NETHER_WART_PLANTED);
+		} else if (isPickableBush(state)) {
+			this.pickBerries(level, pos, state);
 		} else if (hasStemPointingAt(level, pos)) {
 			this.harvestFruit(level, pos, state);
 		}
 	}
 
-	private void harvestCrop(ServerLevel level, BlockPos pos, BlockState state, CropBlock crop) {
+	// Shared by crops and nether wart. The two differ only in the state that
+	// goes back down and the sound that plays: everything else, from reading
+	// the drops before the block falls to setting a seed aside, is the same.
+	private void harvestSown(
+			ServerLevel level, BlockPos pos, BlockState state, BlockState seedling, SoundEvent planted) {
 		// Read the drops while the block still stands. getDrops does not spawn
 		// item entities, unlike every dropResources overload.
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
@@ -157,12 +176,11 @@ public class HarvestCropGoal extends Goal {
 		level.destroyBlock(pos, false, this.golem);
 
 		if (replanting) {
-			BlockState seedling = crop.getStateForAge(0);
 			level.setBlock(pos, seedling, Block.UPDATE_ALL);
 			level.gameEvent(GameEvent.BLOCK_PLACE, pos, GameEvent.Context.of(this.golem, seedling));
 			level.playSound(
 					null, pos.getX(), pos.getY(), pos.getZ(),
-					SoundEvents.CROP_PLANTED, SoundSource.BLOCKS, 1.0F, 1.0F);
+					planted, SoundSource.BLOCKS, 1.0F, 1.0F);
 
 			// Freshly sown, so age 0 and the obvious bone meal target. Park it, or
 			// the two goals feed each other on this one tile until the stack is gone.
@@ -172,15 +190,40 @@ public class HarvestCropGoal extends Goal {
 		this.collect(level, pos, drops);
 	}
 
-	// Melons drop slices to a bare hand and a whole block to silk touch, and the
-	// loot table decides from the enchantment component of the tool. Asking for
-	// the block generalises to modded stem fruit, unlike special-casing an item.
-	// The stem itself is never touched: only the position it points at.
+	// Bare handed, deliberately: a melon yields slices, exactly what a player
+	// gets. Harvesting them whole through a silk touch loot context was free
+	// value the golem had no business creating. The stem itself is never
+	// touched, only the position it points at.
 	private void harvestFruit(ServerLevel level, BlockPos pos, BlockState state) {
-		List<ItemStack> drops =
-				Block.getDrops(state, level, pos, null, this.golem, this.silkTouchTool(level));
+		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
 
 		level.destroyBlock(pos, false, this.golem);
+		this.collect(level, pos, drops);
+	}
+
+	// Picked, not broken: the bush survives and drops back to age 1, which is
+	// what a player's right click does. 26.2 moved that yield into a loot table
+	// of its own, so the quantities are the game's rather than ours. The vanilla
+	// helper that reads it is protected, but every piece it uses is public, so
+	// the parameters are rebuilt here instead of widening access to a method.
+	private void pickBerries(ServerLevel level, BlockPos pos, BlockState state) {
+		LootParams params = new LootParams.Builder(level)
+				.withParameter(LootContextParams.BLOCK_STATE, state)
+				.withOptionalParameter(LootContextParams.INTERACTING_ENTITY, this.golem)
+				.withOptionalParameter(LootContextParams.TOOL, ItemStack.EMPTY)
+				.create(LootContextParamSets.BLOCK_INTERACT);
+
+		List<ItemStack> drops = level.getServer().reloadableRegistries()
+				.getLootTable(BuiltInLootTables.HARVEST_SWEET_BERRY_BUSH)
+				.getRandomItems(params);
+
+		BlockState picked = state.setValue(SweetBerryBushBlock.AGE, 1);
+		level.setBlock(pos, picked, Block.UPDATE_CLIENTS);
+		level.gameEvent(GameEvent.BLOCK_CHANGE, pos, GameEvent.Context.of(this.golem, picked));
+		level.playSound(
+				null, pos.getX(), pos.getY(), pos.getZ(),
+				SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES, SoundSource.BLOCKS, 1.0F, 1.0F);
+
 		this.collect(level, pos, drops);
 	}
 
@@ -198,19 +241,6 @@ public class HarvestCropGoal extends Goal {
 		}
 
 		this.golem.resetIdleTicks();
-	}
-
-	private ItemStack silkTouchTool(ServerLevel level) {
-		if (this.silkTouch == null) {
-			ItemStack tool = new ItemStack(Items.SHEARS);
-			tool.enchant(
-					level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
-							.getOrThrow(Enchantments.SILK_TOUCH),
-					1);
-			this.silkTouch = tool;
-		}
-
-		return this.silkTouch;
 	}
 
 	// The seed is the drop whose item places the very block just harvested.
@@ -289,6 +319,8 @@ public class HarvestCropGoal extends Goal {
 
 					if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
 						found = cursor.immutable();
+					} else if (isRipeWart(state) || isPickableBush(state)) {
+						found = cursor.immutable();
 					} else if (state.getBlock() instanceof AttachedStemBlock) {
 						// Two stems can point at the same pumpkin.
 						BlockPos fruit = cursor.relative(state.getValue(AttachedStemBlock.FACING));
@@ -337,7 +369,26 @@ public class HarvestCropGoal extends Goal {
 			return true;
 		}
 
+		if (isRipeWart(state) || isPickableBush(state)) {
+			return true;
+		}
+
 		return hasStemPointingAt(level, pos);
+	}
+
+	// Nether wart is not a CropBlock, so it needs its own ripeness test. Its
+	// drop is still the BlockItem that places it back, which is why the generic
+	// replanting rule needed nothing at all.
+	private static boolean isRipeWart(BlockState state) {
+		return state.getBlock() instanceof NetherWartBlock
+				&& state.getValue(NetherWartBlock.AGE) >= NetherWartBlock.MAX_AGE;
+	}
+
+	// Age 2 is the point at which vanilla lets a player pick, and picking is all
+	// the golem does here: no replanting, because the bush is still standing.
+	private static boolean isPickableBush(BlockState state) {
+		return state.getBlock() instanceof SweetBerryBushBlock
+				&& state.getValue(SweetBerryBushBlock.AGE) > 1;
 	}
 
 	private static boolean hasStemPointingAt(ServerLevel level, BlockPos pos) {

@@ -11,14 +11,18 @@ import java.nio.file.Path;
 import net.fabricmc.loader.api.FabricLoader;
 
 // Gameplay values live here rather than scattered as constants.
+//
+// The inventory is counted in rows rather than slots because it is shown in a
+// chest screen, and a chest screen only exists in whole rows of nine. Counting
+// slots would let the file ask for a size no screen can display.
 public record ArgilusConfig(
 		int radius,
 		int harvestIntervalTicks,
 		int scanIntervalTicks,
-		int inventorySize,
+		int inventoryRows,
 		int depositIdleTicks,
 		int collectRadius) {
-	private static final ArgilusConfig DEFAULTS = new ArgilusConfig(12, 20, 40, 18, 100, 7);
+	private static final ArgilusConfig DEFAULTS = new ArgilusConfig(12, 20, 40, 2, 100, 7);
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	private static ArgilusConfig current = DEFAULTS;
@@ -53,7 +57,7 @@ public record ArgilusConfig(
 				bound(this.radius, 4, 24, DEFAULTS.radius),
 				bound(this.harvestIntervalTicks, 1, 200, DEFAULTS.harvestIntervalTicks),
 				bound(this.scanIntervalTicks, 20, 400, DEFAULTS.scanIntervalTicks),
-				bound(this.inventorySize, 1, 27, DEFAULTS.inventorySize),
+				bound(this.inventoryRows, 1, 3, DEFAULTS.inventoryRows),
 				bound(this.depositIdleTicks, 20, 2000, DEFAULTS.depositIdleTicks),
 				bound(this.collectRadius, 1, 24, DEFAULTS.collectRadius));
 	}

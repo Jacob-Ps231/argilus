@@ -219,9 +219,7 @@ public class DepositGoal extends Goal {
 	// SPEC.md forbids a dedicated trip to fetch bone meal, so an empty container
 	// simply means nothing happens.
 	private void restock(Container source) {
-		// With a single slot the bone meal would confiscate it and the golem
-		// could never carry a harvest again.
-		if (ArgilusConfig.get().inventorySize() < 2 || this.golem.boneMealSlot() >= 0) {
+		if (this.golem.boneMealSlot() >= 0) {
 			return;
 		}
 
