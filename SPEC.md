@@ -55,8 +55,13 @@ identique, seul le bloc de base change.
 
 Résolveur **générique**, pas une liste codée en dur : toute `CropBlock` dont
 l'âge est au maximum est une cible. La graine de replantation est déduite des
-drops en cherchant l'item qui repose ce bloc. Une table de surcharge explicite
-gère les exceptions connues.
+drops en cherchant l'item qui repose ce bloc, à défaut dans l'inventaire du
+golem.
+
+La table de surcharge prévue ici n'a jamais été nécessaire. Le seul cas qu'elle
+devait couvrir — une culture qui ne fournit aucune graine — est traité par une
+règle générale plutôt que par une liste : cette culture n'est pas récoltée du
+tout, et la case reste intacte.
 
 C'est ce qui donne la compatibilité mods gratuitement : la plupart des cultures
 moddées étendent `CropBlock`.
@@ -157,14 +162,16 @@ spécifique par mod.
 
 #### Résultats mesurés — Farmer's Delight Refabricated 26.2-3.6.17
 
-Testé en jeu. Le résolveur générique n'a demandé **aucun ajustement**.
+Testé en jeu. Le résolveur générique a tenu sur trois cultures sur quatre sans
+rien changer. La quatrième, la tomate, a demandé un ajustement — lui aussi
+générique, et sans une ligne spécifique au mod.
 
 | Culture | Bloc | Comportement |
 | --- | --- | --- |
 | Chou | `CabbageBlock extends CropBlock` | récolté et replanté ✅ |
 | Oignon | `OnionBlock extends CropBlock` | récolté et replanté ✅ |
 | Riz | `RicePaniclesBlock extends CropBlock` | récolté et replanté ✅ |
-| Tomate | `TomatoBlock extends CropBlock` | récolté, **jamais replanté** ⚠️ |
+| Tomate | `TomatoBlock extends CropBlock` | **ignoré**, la liane reste debout ✅ |
 
 La poudre d'os fonctionne sur les quatre, qui implémentent `BonemealableBlock`.
 
@@ -177,11 +184,26 @@ Deux suppositions de cette spec étaient fausses :
 - **Les tomates ne sont pas hors de portée.** `TomatoBlock` étend `CropBlock`,
   donc le golem les récolte bel et bien.
 
-**Limite assumée — les tomates s'épuisent.** Elles ne dropent pas de graine, il
-faut la fabriquer, donc la règle « la graine est le drop qui repose ce bloc » ne
-trouve rien et la case reste nue. Le joueur récupère ses tomates dans le coffre
-mais doit replanter à la main. Garder une tomateraie hors du rayon du golem, ou
-accepter de la replanter.
+**Les tomates sont désormais ignorées, pas saccagées.** Règle générique, sans une
+ligne de code spécifique au mod : une culture mûre dont ni les drops ni
+l'inventaire ne fournissent de quoi la reposer n'est **pas** récoltée. La casser
+stériliserait la case, et un joueur sans graine ne rase pas sa parcelle non plus.
+
+Vérifié dans le jar : `TomatoBlock.useWithoutItem` cueille les tomates et fait
+redescendre l'âge sans casser la liane — le même principe que les baies. Mais
+Farmer's Delight code ses drops en dur (`popResource` avec `ModItems.TOMATO`),
+sans table de loot à interroger, et `TOMATO_SEEDS` pose `BUDDING_TOMATO_CROP`,
+pas la liane. Il n'y a donc rien à lire ni rien à replanter : l'ignorer est le
+seul comportement correct, et c'est celui que le joueur veut, ses lianes
+continuant de produire.
+
+**Mémoire par case, jamais par type de bloc.** Le blé peut tomber zéro graine sur
+un tirage malchanceux ; blacklister le type aurait bloqué le blé définitivement,
+puisque c'est le blé récolté qui fournit les graines. La note est levée dès que
+le bloc change ou que le golem porte une graine adaptée.
+
+Aucune culture vanilla n'est concernée : blé, betterave, torchflower et pitcher
+dropent tous l'item qui repose leur bloc — lu dans leurs tables de loot.
 
 Ne sont pas des `CropBlock` et restent donc invisibles au golem :
 `BuddingTomatoBlock`, `RiceBlock` et `WildRiceBlock`.

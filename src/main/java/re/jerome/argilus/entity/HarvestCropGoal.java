@@ -2,7 +2,9 @@ package re.jerome.argilus.entity;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -50,6 +52,11 @@ public class HarvestCropGoal extends Goal {
 
 	private final ArgilusEntity golem;
 	private final List<BlockPos> targets = new ArrayList<>();
+
+	// Tiles the golem walked to and could not replant, with the block it found
+	// there. Kept so the trip is not made again every scan, which on a patch of
+	// a modded crop that drops no seed would be most of what the golem does.
+	private final Map<BlockPos, Block> unreplantable = new HashMap<>();
 	private BlockPos target;
 	private long nextScanTime;
 	private long nextHarvestTime;
@@ -163,29 +170,35 @@ public class HarvestCropGoal extends Goal {
 		// Read the drops while the block still stands. getDrops does not spawn
 		// item entities, unlike every dropResources overload.
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
-		boolean replanting = takeSeed(drops, state.getBlock());
 
-		// Nothing in the harvest can reseed it, so fall back on what the golem
-		// already carries rather than leave the tile bare.
+		// The harvest reseeds itself where it can; otherwise fall back on what
+		// the golem already carries rather than leave the tile bare.
+		boolean replanting = takeSeed(drops, state.getBlock())
+				|| this.takeSeedFromInventory(state.getBlock());
+
+		// Nothing anywhere can put this crop back, so breaking it would strip
+		// the tile for good. Leave it standing: a player who cannot replant a
+		// patch does not flatten it either, and the golem should not be the
+		// worse farmer of the two. Remember the tile so the walk is not
+		// repeated; carrying a seed for it later is what lifts the note.
 		if (!replanting) {
-			replanting = this.takeSeedFromInventory(state.getBlock());
+			this.unreplantable.put(pos.immutable(), state.getBlock());
+			return;
 		}
 
 		// false: keep the break particles and sound, skip the vanilla drops,
 		// which we hand out ourselves once a seed has been set aside.
 		level.destroyBlock(pos, false, this.golem);
 
-		if (replanting) {
-			level.setBlock(pos, seedling, Block.UPDATE_ALL);
-			level.gameEvent(GameEvent.BLOCK_PLACE, pos, GameEvent.Context.of(this.golem, seedling));
-			level.playSound(
-					null, pos.getX(), pos.getY(), pos.getZ(),
-					planted, SoundSource.BLOCKS, 1.0F, 1.0F);
+		level.setBlock(pos, seedling, Block.UPDATE_ALL);
+		level.gameEvent(GameEvent.BLOCK_PLACE, pos, GameEvent.Context.of(this.golem, seedling));
+		level.playSound(
+				null, pos.getX(), pos.getY(), pos.getZ(),
+				planted, SoundSource.BLOCKS, 1.0F, 1.0F);
 
-			// Freshly sown, so age 0 and the obvious bone meal target. Park it, or
-			// the two goals feed each other on this one tile until the stack is gone.
-			this.golem.suppressBoneMeal(pos, level.getGameTime());
-		}
+		// Freshly sown, so age 0 and the obvious bone meal target. Park it, or
+		// the two goals feed each other on this one tile until the stack is gone.
+		this.golem.suppressBoneMeal(pos, level.getGameTime());
 
 		this.collect(level, pos, drops);
 	}
@@ -259,23 +272,52 @@ public class HarvestCropGoal extends Goal {
 	}
 
 	private boolean takeSeedFromInventory(Block harvested) {
+		int slot = this.findSeedSlot(harvested);
+
+		if (slot < 0) {
+			return false;
+		}
+
+		SimpleContainer inventory = this.golem.getInventory();
+		ItemStack stack = inventory.getItem(slot);
+		stack.shrink(1);
+
+		if (stack.isEmpty()) {
+			inventory.setItem(slot, ItemStack.EMPTY);
+		}
+
+		return true;
+	}
+
+	private int findSeedSlot(Block harvested) {
 		SimpleContainer inventory = this.golem.getInventory();
 
 		for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-			ItemStack stack = inventory.getItem(slot);
-
-			if (isSeedFor(stack, harvested)) {
-				stack.shrink(1);
-
-				if (stack.isEmpty()) {
-					inventory.setItem(slot, ItemStack.EMPTY);
-				}
-
-				return true;
+			if (isSeedFor(inventory.getItem(slot), harvested)) {
+				return slot;
 			}
 		}
 
-		return false;
+		return -1;
+	}
+
+	// A note is only worth keeping while it still describes the tile. The block
+	// having changed clears it, and so does the golem picking up a seed that
+	// would now replant it: an unlucky wheat harvest can drop no seeds at all,
+	// and that tile has to come back once seeds are on hand again.
+	private boolean isUnreplantable(ServerLevel level, BlockPos pos) {
+		Block noted = this.unreplantable.get(pos);
+
+		if (noted == null) {
+			return false;
+		}
+
+		if (noted != level.getBlockState(pos).getBlock() || this.findSeedSlot(noted) >= 0) {
+			this.unreplantable.remove(pos);
+			return false;
+		}
+
+		return true;
 	}
 
 	private static boolean isSeedFor(ItemStack stack, Block harvested) {
@@ -318,7 +360,7 @@ public class HarvestCropGoal extends Goal {
 					BlockPos found = null;
 
 					if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
-						found = cursor.immutable();
+						found = this.isUnreplantable(level, cursor) ? null : cursor.immutable();
 					} else if (isRipeWart(state) || isPickableBush(state)) {
 						found = cursor.immutable();
 					} else if (state.getBlock() instanceof AttachedStemBlock) {

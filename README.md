@@ -69,10 +69,16 @@ drops a seed that places it back is handled without this mod knowing it exists.
 Verified against Farmer's Delight Refabricated: cabbage, onion and rice all work
 untouched.
 
-**Known limit.** A crop that drops no seed cannot be replanted, so the golem
-harvests it and leaves the tile bare. Farmer's Delight tomatoes are the case in
-point, since their seeds have to be crafted. Keep such a patch outside the
-radius, or replant it by hand.
+A crop the golem cannot put back is left standing rather than harvested. A
+player who has no seed for a patch does not flatten it either, and the golem
+should not be the worse farmer of the two. The tile is remembered so the trip is
+not repeated, and the note lifts as soon as the golem carries a seed that would
+replant it.
+
+Farmer's Delight tomatoes are the case in point. Their vine is picked by hand
+and survives, but nothing it drops puts the vine back, and tomato seeds plant a
+different block. The golem therefore leaves a tomato patch entirely alone, which
+is the outcome you want: harvest it yourself and the vines keep producing.
 
 Sweet berry bushes and nether wart are matched the same way, by block type, so a
 modded plant extending either is handled too. Anything outside those three
