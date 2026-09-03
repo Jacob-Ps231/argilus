@@ -3,7 +3,7 @@
 	"id": "argilus",
 	"version": "${version}",
 	"name": "Argilus",
-	"description": "A clay golem that harvests crops, replants them and stores them in a container.",
+	"description": "A clay golem that tends a farm on its own. It harvests and replants crops, berries and nether wart, picks up what falls, and empties itself into a chest it remembers.",
 	"authors": [
 		"Jerome"
 	],
