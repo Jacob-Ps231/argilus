@@ -1,7 +1,8 @@
 # Argilus
 
 A clay golem that tends a farm on its own. It harvests what is ripe, replants it,
-picks up what falls, and empties itself into a chest it remembers.
+picks up what falls, and empties itself into a chest it remembers. Right click it
+to see what it is carrying.
 
 Deliberately simpler than what exists elsewhere: no hunger, no lifespan, no
 sleep, no third parties. One golem, a handful of behaviours done properly.
