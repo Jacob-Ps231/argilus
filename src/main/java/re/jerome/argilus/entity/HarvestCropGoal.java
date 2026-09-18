@@ -24,9 +24,6 @@ import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
-import net.minecraft.world.level.storage.loot.LootParams;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import re.jerome.argilus.ArgilusConfig;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
@@ -35,7 +32,7 @@ import re.jerome.argilus.ArgilusConfig;
 // being rebuilt from a 3x3x3 cube every time.
 //
 // Pumpkins and melons are found from their stem, never by looking for fruit
-// blocks. Nothing in 26.2 identifies a fruit block: no shared superclass, no
+// blocks. Nothing in 26.3 identifies a fruit block: no shared superclass, no
 // tag, and StemBlock keeps its fruit and seed fields private with no accessor.
 // But an attached stem only exists while its fruit does, so whatever it points
 // at is its fruit by construction. Decorative pumpkins have no stem aimed at
@@ -215,20 +212,17 @@ public class HarvestCropGoal extends Goal {
 	}
 
 	// Picked, not broken: the bush survives and drops back to age 1, which is
-	// what a player's right click does. 26.2 moved that yield into a loot table
-	// of its own, so the quantities are the game's rather than ours. The vanilla
-	// helper that reads it is protected, but every piece it uses is public, so
-	// the parameters are rebuilt here instead of widening access to a method.
+	// what a player's right click does. The yield is the game's own loot table,
+	// read through the very helper the bush calls — public as of 26.3, where
+	// that loot context also gained a mandatory origin. Assembling those
+	// parameters by hand, as this did while the helper was protected, is one
+	// more place to keep in step with the game for nothing. No tool and no
+	// block entity: the golem picks bare handed, and a bush has neither.
 	private void pickBerries(ServerLevel level, BlockPos pos, BlockState state) {
-		LootParams params = new LootParams.Builder(level)
-				.withParameter(LootContextParams.BLOCK_STATE, state)
-				.withOptionalParameter(LootContextParams.INTERACTING_ENTITY, this.golem)
-				.withOptionalParameter(LootContextParams.TOOL, ItemStack.EMPTY)
-				.create(LootContextParamSets.BLOCK_INTERACT);
-
-		List<ItemStack> drops = level.getServer().reloadableRegistries()
-				.getLootTable(BuiltInLootTables.HARVEST_SWEET_BERRY_BUSH)
-				.getRandomItems(params);
+		List<ItemStack> drops = new ArrayList<>();
+		Block.dropFromBlockInteractLootTable(
+				level, BuiltInLootTables.HARVEST_SWEET_BERRY_BUSH, pos, state,
+				null, null, this.golem, (ignored, stack) -> drops.add(stack));
 
 		BlockState picked = state.setValue(SweetBerryBushBlock.AGE, 1);
 		level.setBlock(pos, picked, Block.UPDATE_CLIENTS);

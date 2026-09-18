@@ -7,13 +7,13 @@ cultures dans un conteneur.
 
 | Élément            | Version              |
 | ------------------ | -------------------- |
-| Minecraft          | 26.2                 |
+| Minecraft          | 26.3                 |
 | Loader             | Fabric               |
 | JDK                | 25                   |
-| Gradle             | 9.5.1                |
-| Fabric Loom        | 1.17.19              |
-| Fabric Loader      | 0.19.3               |
-| Fabric API         | 0.158.0+26.2         |
+| Gradle             | 9.6.0                |
+| Fabric Loom        | 1.17.21              |
+| Fabric Loader      | 0.19.5               |
+| Fabric API         | 0.160.7+26.3         |
 | Mappings           | aucune (désobfusqué) |
 | Mod ID             | `argilus`            |
 | Package            | `re.jerome.argilus`  |
@@ -25,12 +25,16 @@ Minecraft a changé de schéma de version en 2026 : la ligne 1.21.x a été suiv
 26.1, 26.2, etc. **Toute connaissance issue de l'entraînement sur les versions
 1.x est probablement obsolète ici.** 26.1 a introduit la désobfuscation complète
 et l'exigence de Java 25 ; 26.2 a retouché le rendering et l'enregistrement des
-blocs/items (les IDs de blocs et d'items sont désormais stockés séparément).
+blocs/items (les IDs de blocs et d'items sont désormais stockés séparément) ;
+26.3 a introduit les *block transformers*, supprimé les `Codec` des classes
+`Block` et remplacé GLFW par SDL.
 
 Avant d'écrire du code touchant à une API que tu n'as pas déjà lue **dans cette
 session** :
 
-1. Consulte `docs.fabricmc.net` (dont la page « Porting to 26.2 »).
+1. Consulte `docs.fabricmc.net`. Pas de page « Porting to 26.3 » à ce jour : le
+   mémo `SETUP-MC-MODDING-26.3.md` (dans `Documents\ESPACE AGENT\`) tient lieu
+   de doc de portage.
 2. Lis les sources vanilla décompilées dans le cache Gradle — le jeu est
    désobfusqué, elles sont lisibles directement.
 3. Si tu n'es pas sûr d'une signature, dis-le et vérifie. N'invente jamais un nom

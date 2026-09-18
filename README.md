@@ -88,7 +88,7 @@ generic rule cannot handle.
 
 ## Requirements
 
-Minecraft 26.2, Fabric Loader 0.19.3 or later, Fabric API, Java 25.
+Minecraft 26.3, Fabric Loader 0.19.5 or later, Fabric API, Java 25.
 
 ## Deposit containers
 
