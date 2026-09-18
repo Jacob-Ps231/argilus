@@ -5,7 +5,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import re.jerome.argilus.Argilus;
 
-// Minecraft 26.2 stores item ids separately from the items themselves.
+// Minecraft has stored item ids separately from the items themselves since 26.2.
 public final class ModItemIds {
 	public static final ResourceKey<Item> ARGILUS_SPAWN_EGG = create("argilus_spawn_egg");
 

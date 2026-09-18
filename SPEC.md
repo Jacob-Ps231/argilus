@@ -88,8 +88,24 @@ l'âge 1, comme au clic droit du joueur. Pas de replantation — le buisson est
 toujours debout — et pas de plantation de nouveaux buissons, décision explicite
 pour que le golem ne colonise pas le terrain.
 
-26.2 range ce rendement dans une table de loot dédiée
-(`harvest/sweet_berry_bush`), donc aucune quantité n'est écrite en dur.
+Depuis 26.2, ce rendement vient d'une table de loot dédiée
+(`harvest/sweet_berry_bush`), donc aucune quantité n'est écrite en dur. Depuis le
+portage en 26.3, elle est lue par le helper vanilla
+`Block.dropFromBlockInteractLootTable`, qui remplit lui-même les paramètres de
+contexte — dont `ORIGIN`, que 26.3 rend obligatoire.
+
+La clé de cette table n'est pas codée en dur : elle est dérivée du bloc récolté,
+`harvest/<id du bloc>`, là où se trouve celle du buisson vanilla. Un buisson
+moddé qui livre la sienne à cet endroit rend donc ses propres baies. Sans rien à
+cet endroit, on retombe sur la table vanilla — c'est exactement ce que le
+buisson moddé donne au joueur s'il n'a pas redéfini sa cueillette, vanilla y
+nommant sa table en dur.
+
+Ce n'est pas une convention garantie : sur les trois tables `harvest/` de
+vanilla, celle du buisson est la seule à ne desservir qu'un bloc. `beehive` sert
+la ruche et le nid d'abeilles, `cave_vine` sert les deux blocs de vigne
+caverneuse et ne porte l'id ni de l'un ni de l'autre. C'est un point d'entrée
+offert aux mods, pas une règle du jeu.
 
 Le buisson est de type `PathType.DAMAGING`, malus -1 : le navigateur refuse d'y
 entrer. Une baie au milieu d'un carré de baies devient alors inatteignable, le

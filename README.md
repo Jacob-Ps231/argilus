@@ -82,9 +82,12 @@ different block. The golem therefore leaves a tomato patch entirely alone, which
 is the outcome you want: harvest it yourself and the vines keep producing.
 
 Sweet berry bushes and nether wart are matched the same way, by block type, so a
-modded plant extending either is handled too. Anything outside those three
-families is invisible to the golem, which is the right outcome for what the
-generic rule cannot handle.
+modded plant extending either is handled too. A modded bush yields its own
+berries when it ships a loot table at `harvest/<its block id>` in its own
+namespace; without one it yields sweet berries, which is what the game itself
+hands you for a bush that has not redefined its own picking.
+Anything outside those three families is invisible to the golem, which is the
+right outcome for what the generic rule cannot handle.
 
 ## Requirements
 

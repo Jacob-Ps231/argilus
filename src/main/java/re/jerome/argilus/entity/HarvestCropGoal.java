@@ -7,6 +7,10 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -24,6 +28,7 @@ import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
+import net.minecraft.world.level.storage.loot.LootTable;
 import re.jerome.argilus.ArgilusConfig;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
@@ -42,6 +47,13 @@ import re.jerome.argilus.ArgilusConfig;
 // reason CropBlock is: a modded block extending either one is handled without
 // this goal knowing it exists. Neither belongs to a usable vanilla tag, since
 // #minecraft:crops holds neither.
+//
+// A bush is the one case where matching the type is not enough to serve it. Its
+// yield lives in a loot table the block names itself, and nothing exposes which,
+// so the key is derived from the block's id, where the sweet berry bush's own
+// table happens to sit. A modded bush that ships one there hands over its own
+// berries; one that ships none inherits vanilla's pick, sweet berries included,
+// and the golem brings back exactly what a player would.
 public class HarvestCropGoal extends Goal {
 	private static final int VERTICAL_REACH = 2;
 	private static final double HARVEST_REACH = 2.5;
@@ -212,24 +224,28 @@ public class HarvestCropGoal extends Goal {
 	}
 
 	// Picked, not broken: the bush survives and drops back to age 1, which is
-	// what a player's right click does. The yield is the game's own loot table,
-	// read through the very helper the bush calls — public as of 26.3, where
-	// that loot context also gained a mandatory origin. Assembling those
-	// parameters by hand, as this did while the helper was protected, is one
-	// more place to keep in step with the game for nothing. No tool and no
+	// what a player's right click does. The yield is whatever table the harvest
+	// key resolves to, read through the helper the bush itself calls — public as
+	// of 26.3, where that loot context also gained a mandatory origin. Assembling
+	// those parameters by hand, as this did while the helper was protected, is
+	// one more place to keep in step with the game for nothing. No tool and no
 	// block entity: the golem picks bare handed, and a bush has neither.
 	private void pickBerries(ServerLevel level, BlockPos pos, BlockState state) {
+		ResourceKey<LootTable> table = harvestTable(level, state.getBlock());
 		List<ItemStack> drops = new ArrayList<>();
 		Block.dropFromBlockInteractLootTable(
-				level, BuiltInLootTables.HARVEST_SWEET_BERRY_BUSH, pos, state,
+				level, table, pos, state,
 				null, null, this.golem, (ignored, stack) -> drops.add(stack));
 
 		BlockState picked = state.setValue(SweetBerryBushBlock.AGE, 1);
 		level.setBlock(pos, picked, Block.UPDATE_CLIENTS);
 		level.gameEvent(GameEvent.BLOCK_CHANGE, pos, GameEvent.Context.of(this.golem, picked));
+		// Pitch spread like vanilla's, so a golem working a berry patch does not
+		// ring out as one machine-perfect note repeated.
 		level.playSound(
 				null, pos.getX(), pos.getY(), pos.getZ(),
-				SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES, SoundSource.BLOCKS, 1.0F, 1.0F);
+				SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES, SoundSource.BLOCKS,
+				1.0F, 0.8F + level.getRandom().nextFloat() * 0.4F);
 
 		this.collect(level, pos, drops);
 	}
@@ -425,6 +441,25 @@ public class HarvestCropGoal extends Goal {
 	private static boolean isPickableBush(BlockState state) {
 		return state.getBlock() instanceof SweetBerryBushBlock
 				&& state.getValue(SweetBerryBushBlock.AGE) > 1;
+	}
+
+	// A bush names its own picked yield and offers nothing to ask, so the key is
+	// derived from the block id — where the sweet berry bush's table happens to
+	// sit. A modded bush that ships one there hands over its own berries instead
+	// of sweet ones, which naming the vanilla table outright used to do.
+	//
+	// Nothing filed there, which getLootTable reports by answering the empty
+	// table, means falling back on that same vanilla table: a bush that inherits
+	// its pick unchanged is one vanilla itself pays in sweet berries, so that is
+	// what the player gets from it and what the golem must bring back.
+	private static ResourceKey<LootTable> harvestTable(ServerLevel level, Block bush) {
+		Identifier id = BuiltInRegistries.BLOCK.getKey(bush);
+		ResourceKey<LootTable> key =
+				ResourceKey.create(Registries.LOOT_TABLE, id.withPrefix("harvest/"));
+
+		return level.getServer().reloadableRegistries().getLootTable(key) == LootTable.EMPTY
+				? BuiltInLootTables.HARVEST_SWEET_BERRY_BUSH
+				: key;
 	}
 
 	private static boolean hasStemPointingAt(ServerLevel level, BlockPos pos) {
