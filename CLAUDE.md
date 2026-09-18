@@ -99,7 +99,15 @@ seule implémentation. Le code le plus court qui marche et se lit.
    terminée.
 3. En cas de crash : lis `logs/latest.log`, remonte-moi la stacktrace pertinente,
    pas le fichier entier.
-4. Commit git à chaque étape validée.
+4. **Avant chaque commit, faire relire le diff par un sous-agent** (outil
+   `Agent`), en lecture seule : il ne modifie rien et ne commite rien. Lui
+   donner le diff à committer (`git diff` **et** `git diff --staged`) et ce
+   fichier — règles n°1 à n°3, Conventions, et les « Pièges connus » plus bas.
+   Ce qu'il cherche : justesse du code (client/serveur, coût par tick, NBT),
+   signatures vanilla réellement vérifiées et non supposées, commentaires qui
+   décrivent encore ce que fait le code. Tu me remontes ce qu'il trouve et tu
+   corriges. Un « rien à signaler » se dit aussi.
+5. Un commit git par étape validée, une fois cette relecture passée.
 
 ## Pièges connus sur ce projet
 
