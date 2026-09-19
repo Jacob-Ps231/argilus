@@ -3,8 +3,10 @@ package re.jerome.argilus.entity;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -15,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.BlockItem;
@@ -22,13 +25,19 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
+import net.minecraft.world.level.block.VegetationBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import re.jerome.argilus.Argilus;
 import re.jerome.argilus.ArgilusConfig;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
@@ -58,6 +67,15 @@ public class HarvestCropGoal extends Goal {
 	private static final int VERTICAL_REACH = 2;
 	private static final double HARVEST_REACH = 2.5;
 	private static final double SPEED = 0.9;
+
+	// Blocks whose picking threw for want of a player. A trait of the block, not
+	// of a tile or of a golem, so every golem in the world learns it at once.
+	private static final Set<Block> NEEDS_A_PLAYER = new HashSet<>();
+
+	// What came of asking a crop to be picked. UNTOUCHED is the one answer that
+	// leaves the tile exactly as it was read, and so the one that lets another
+	// rule have a go at it.
+	private enum Pick { TAKEN, ANSWERED, UNTOUCHED }
 
 	private final ArgilusEntity golem;
 	private final List<BlockPos> targets = new ArrayList<>();
@@ -185,12 +203,36 @@ public class HarvestCropGoal extends Goal {
 		boolean replanting = takeSeed(drops, state.getBlock())
 				|| this.takeSeedFromInventory(state.getBlock());
 
-		// Nothing anywhere can put this crop back, so breaking it would strip
-		// the tile for good. Leave it standing: a player who cannot replant a
-		// patch does not flatten it either, and the golem should not be the
-		// worse farmer of the two. Remember the tile so the walk is not
-		// repeated; carrying a seed for it later is what lifts the note.
 		if (!replanting) {
+			// Nothing the golem can plant puts this crop back, but a crop that
+			// fruits on a plant it keeps is not meant to be broken at all: it is
+			// picked, and picking it is an interaction, not a loot table. Ask.
+			Pick pick = this.pickByHand(level, pos, state);
+
+			if (pick == Pick.TAKEN) {
+				return;
+			}
+
+			// Refused, but the tile is not necessarily lost: a crop growing on a
+			// living plant is that plant's fruit, not the whole crop. Taking it
+			// leaves the plant standing to make another, so it is broken without
+			// being replanted — replanting is the plant's own work. Rice
+			// panicles on their stalk are the shape of it.
+			//
+			// Only for a block that never had its say. One that answered has
+			// already done what it does with this tile, and breaking it on top
+			// of that would pay its yield a second time.
+			if (pick == Pick.UNTOUCHED && growsOnAPlant(level, pos)) {
+				level.destroyBlock(pos, false, this.golem);
+				this.collect(level, pos, drops);
+				return;
+			}
+
+			// Breaking it here would strip the tile for good. Leave it standing:
+			// a player who cannot replant a patch does not flatten it either,
+			// and the golem should not be the worse farmer of the two. Remember
+			// the tile so the walk is not repeated; carrying a seed for it later
+			// is what lifts the note.
 			this.unreplantable.put(pos.immutable(), state.getBlock());
 			return;
 		}
@@ -210,6 +252,67 @@ public class HarvestCropGoal extends Goal {
 		this.golem.suppressBoneMeal(pos, level.getGameTime());
 
 		this.collect(level, pos, drops);
+	}
+
+	// The empty handed right click, which is the only harvest a crop keeping its
+	// plant answers to: no drop list and no loot table describes what it yields,
+	// its own code does. No crop block in the game answers it, so asking a
+	// vanilla field costs it nothing at all.
+	//
+	// What falls is left on the ground for the collecting goal to fetch, since
+	// the block hands its yield to the world rather than to the caller.
+	//
+	// The player is null, which is a liberty: a golem is not one, and nothing
+	// hands out a player to stand in for it. A block that reads it throws, and
+	// is then asked no more, rather than throwing over every crop of its kind
+	// for the rest of the game. A mod built against another version of the game
+	// fails the same way, so linkage errors are caught here too — the whole
+	// point of this being one interaction and not a crash.
+	private Pick pickByHand(ServerLevel level, BlockPos pos, BlockState state) {
+		Block block = state.getBlock();
+
+		if (NEEDS_A_PLAYER.contains(block)) {
+			return Pick.UNTOUCHED;
+		}
+
+		// A mob may only pick things up under mobGriefing, and this yield lands
+		// on the ground. Without that rule the golem would strip a plant into a
+		// pile it cannot carry, so it does not touch it at all.
+		if (!level.getGameRules().get(GameRules.MOB_GRIEFING)) {
+			return Pick.UNTOUCHED;
+		}
+
+		InteractionResult picked;
+
+		try {
+			picked = state.useWithoutItem(
+					level, null, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
+		} catch (RuntimeException | LinkageError refused) {
+			NEEDS_A_PLAYER.add(block);
+			Argilus.LOGGER.warn(
+					"Picking {} threw, so the golem asks it no more and leaves it alone", block, refused);
+
+			// It may have got halfway before throwing, so the tile is no longer
+			// one this goal can claim to know.
+			return Pick.ANSWERED;
+		}
+
+		if (!picked.consumesAction()) {
+			return level.getBlockState(pos) == state ? Pick.UNTOUCHED : Pick.ANSWERED;
+		}
+
+		// Answering yes is not proof of a harvest: a block that consumes the
+		// click without ripening down stays a target, and would be asked again
+		// every scan, forever. Read on this tile alone — what the neighbours
+		// carry decides nothing.
+		if (isRipe(level.getBlockState(pos))) {
+			return Pick.ANSWERED;
+		}
+
+		// Picked, so the plant is young again and the obvious bone meal target.
+		// Park it, or the two goals feed each other on this one tile.
+		this.golem.suppressBoneMeal(pos, level.getGameTime());
+		return Pick.TAKEN;
 	}
 
 	// Bare handed, deliberately: a melon yields slices, exactly what a player
@@ -417,15 +520,35 @@ public class HarvestCropGoal extends Goal {
 	private static boolean isHarvestable(ServerLevel level, BlockPos pos) {
 		BlockState state = level.getBlockState(pos);
 
-		if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
-			return true;
-		}
-
-		if (isRipeWart(state) || isPickableBush(state)) {
+		if (isRipe(state) || isPickableBush(state)) {
 			return true;
 		}
 
 		return hasStemPointingAt(level, pos);
+	}
+
+	// Whether what this crop grew from is another plant rather than ground: one
+	// that grows and takes bone meal is one that puts its fruit back by itself.
+	// A vanilla field never reads as one, and not by luck — a crop may only sit
+	// on #minecraft:supports_crops and nether wart on #minecraft:supports_nether_wart,
+	// which hold farmland and soul sand, neither of them a plant.
+	//
+	// Another crop below is not a plant bearing fruit but the same crop one
+	// storey down: a tomato vine climbs its rope up to three high, and taking
+	// the top of that for a fruit would have the golem break the player's vine.
+	private static boolean growsOnAPlant(ServerLevel level, BlockPos pos) {
+		Block below = level.getBlockState(pos.below()).getBlock();
+
+		return below instanceof VegetationBlock
+				&& below instanceof BonemealableBlock
+				&& !(below instanceof CropBlock);
+	}
+
+	// Ripe for the harvest that breaks and replants, which is the reading that
+	// makes a tile a target in the first place.
+	private static boolean isRipe(BlockState state) {
+		return (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state))
+				|| isRipeWart(state);
 	}
 
 	// Nether wart is not a CropBlock, so it needs its own ripeness test. Its

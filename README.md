@@ -67,8 +67,9 @@ Compatibility comes from being generic rather than from per-mod code, so there
 is no hard dependency on anything. A modded crop that extends `CropBlock` and
 drops a seed that places it back is handled without this mod knowing it exists.
 
-Verified against Farmer's Delight Refabricated: cabbage, onion and rice all work
-untouched.
+Verified against Farmer's Delight Refabricated: cabbage and onion work untouched,
+and rice and tomatoes each needed a rule of their own, both written for the shape
+of the crop rather than for that mod.
 
 A crop the golem cannot put back is left standing rather than harvested. A
 player who has no seed for a patch does not flatten it either, and the golem
@@ -76,10 +77,30 @@ should not be the worse farmer of the two. The tile is remembered so the trip is
 not repeated, and the note lifts as soon as the golem carries a seed that would
 replant it.
 
-Farmer's Delight tomatoes are the case in point. Their vine is picked by hand
-and survives, but nothing it drops puts the vine back, and tomato seeds plant a
-different block. The golem therefore leaves a tomato patch entirely alone, which
-is the outcome you want: harvest it yourself and the vines keep producing.
+Farmer's Delight tomatoes are the case in point. Their vine is picked rather
+than broken: nothing it drops puts the vine back, and tomato seeds plant a
+different block. So before giving up on a crop it cannot replant, the golem
+gives it the empty-handed right click you would. The vine hands over its
+tomatoes and goes back to growing, and the golem gathers what falls. No vanilla
+crop answers that click, so a vanilla field is never affected by it.
+
+This is the one harvest that leaves its yield on the ground, so it needs
+`mobGriefing` on, the rule that lets any mob pick anything up. With that rule
+off the golem does not pick such a crop at all, rather than empty a plant into a
+pile it cannot carry. Its other harvests go straight into its inventory and keep
+working — though with `mobGriefing` off, whatever overflows a full inventory is
+dropped and cannot be picked up again either.
+
+A crop growing on top of another plant, like Farmer's Delight rice on its stalk,
+is that plant's fruit rather than the whole crop: the golem takes it and leaves
+the stalk to grow another, replanting nothing. Nothing vanilla reads that way,
+since a crop may only stand on farmland and nether wart on soul sand, neither of
+them a plant. Neither does a crop stacked on itself, like a tomato vine climbing
+its rope — that is the same crop one storey down, and it stays put.
+
+A crop that neither answers a right click nor grows on a plant, and that nothing
+can replant, is left standing rather than harvested: your patch keeps producing
+instead of being stripped for good.
 
 Sweet berry bushes and nether wart are matched the same way, by block type, so a
 modded plant extending either is handled too. A modded bush yields its own

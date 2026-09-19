@@ -176,18 +176,22 @@ Objectif : marcher avec les mods de cultures (type Farmer's Delight) **sans
 dépendance dure**. La compat vient de l'approche générique, pas d'un code
 spécifique par mod.
 
-#### Résultats mesurés — Farmer's Delight Refabricated 26.2-3.6.17
+#### Résultats mesurés — Farmer's Delight Refabricated
 
-Testé en jeu. Le résolveur générique a tenu sur trois cultures sur quatre sans
-rien changer. La quatrième, la tomate, a demandé un ajustement — lui aussi
-générique, et sans une ligne spécifique au mod.
+Mesuré une première fois sur `26.2-3.6.17`, revérifié sur `26.3-3.6.26` après le
+portage.
+
+Testé en jeu. Le résolveur générique a tenu tel quel sur le chou et l'oignon. Les
+deux autres, la tomate et le riz, ont demandé chacune une règle — génériques
+toutes les deux, écrites sur la forme de la culture et non sur le mod, sans une
+ligne qui le nomme.
 
 | Culture | Bloc | Comportement |
 | --- | --- | --- |
 | Chou | `CabbageBlock extends CropBlock` | récolté et replanté ✅ |
 | Oignon | `OnionBlock extends CropBlock` | récolté et replanté ✅ |
-| Riz | `RicePaniclesBlock extends CropBlock` | récolté et replanté ✅ |
-| Tomate | `TomatoBlock extends CropBlock` | **ignoré**, la liane reste debout ✅ |
+| Riz | `RicePaniclesBlock extends CropBlock` | panicules récoltées, le pied les repose ✅ |
+| Tomate | `TomatoBlock extends CropBlock` | cueilli, la liane reste debout ✅ |
 
 La poudre d'os fonctionne sur les quatre, qui implémentent `BonemealableBlock`.
 
@@ -197,23 +201,83 @@ Deux suppositions de cette spec étaient fausses :
   moitié haute qui est une `CropBlock`, et laisse le pied `RiceBlock` intact. Le
   plant repousse. Ça marche par construction, pas par chance : notre règle ne
   cible que les `CropBlock` mûres, et le pied n'en est pas une.
+
+  **Mesuré à nouveau en 26.3 : le riz avait cessé de marcher**, et pas à cause du
+  portage. La règle « laisser debout ce qu'on ne peut pas replanter », arrivée en
+  1.1.0, l'avait éteint sans que personne rejoue le riz : à main nue les
+  panicules donnent `rice_panicle`, qui n'est pas la graine — `rice` ne tombe
+  qu'avec un couteau — donc plus rien à replanter, donc case notée et
+  définitivement ignorée. Vu en jeu, ça ressemble à « le golem ignore le riz ».
+  Corrigé par la règle 2 ci-dessous.
 - **Les tomates ne sont pas hors de portée.** `TomatoBlock` étend `CropBlock`,
   donc le golem les récolte bel et bien.
 
-**Les tomates sont désormais ignorées, pas saccagées.** Règle générique, sans une
-ligne de code spécifique au mod : une culture mûre dont ni les drops ni
-l'inventaire ne fournissent de quoi la reposer n'est **pas** récoltée. La casser
-stériliserait la case, et un joueur sans graine ne rase pas sa parcelle non plus.
+**Le point de départ : rien ne replante une liane à tomates.** Ni les drops ni
+l'inventaire ne fournissent de quoi la reposer. La table de loot du bloc existe
+pourtant et donne bien des `tomato_seeds` à la casse — mais cette graine pose
+`budding_tomatoes`, pas la liane, donc la règle générique (« chercher dans les
+drops l'item qui repose ce bloc ») ne trouve rien.
 
-Vérifié dans le jar : `TomatoBlock.useWithoutItem` cueille les tomates et fait
-redescendre l'âge sans casser la liane — le même principe que les baies. Mais
-Farmer's Delight code ses drops en dur (`popResource` avec `ModItems.TOMATO`),
-sans table de loot à interroger, et `TOMATO_SEEDS` pose `BUDDING_TOMATO_CROP`,
-pas la liane. Il n'y a donc rien à lire ni rien à replanter : l'ignorer est le
-seul comportement correct, et c'est celui que le joueur veut, ses lianes
-continuant de produire.
+Trois règles s'enchaînent alors, **dans cet ordre, qui est celui du code**.
 
-**Mémoire par case, jamais par type de bloc.** Le blé peut tomber zéro graine sur
+**Règle 1 : avant d'abandonner la case, demander au bloc.** Une culture qui
+fructifie sur un plant qu'elle garde ne se casse pas, elle se cueille — et la
+cueillette est une interaction, que ni les drops ni une table de loot ne
+décrivent. Le golem appelle donc `useWithoutItem` sur le bloc, exactement le clic
+droit du joueur, et passe à la règle suivante si le bloc refuse.
+
+Vérifié dans le jar : `TomatoBlock.useWithoutItem` fait tomber les tomates au sol
+et redescend l'âge sans casser la liane. Ce que le bloc fait tomber, le golem le
+ramasse avec son goal de collecte, comme n'importe quel item au sol. Aucune ligne
+spécifique au mod : aucune `CropBlock` vanilla ne surcharge `useWithoutItem`, un
+champ vanilla répond donc `PASS` et n'est pas touché.
+
+Précision : c'est le clic droit **à main vide**. Le clic d'un joueur passe
+d'abord par `useItemOn`, toujours, et n'atteint `useWithoutItem` que si le
+premier renvoie « essaie à main vide » ; un mod qui logerait sa cueillette dans
+`useItemOn` resterait hors de portée du golem. La réciproque existe aussi : le
+golem attaque `useWithoutItem` directement, donc un bloc que `useItemOn`
+refuserait serait quand même cueilli par lui.
+
+**Le joueur passé est `null`.** C'est une liberté prise, pas un usage supporté :
+un golem n'est pas un joueur et rien ne fournit de doublure. Un bloc qui lit ce
+paramètre lève, et un mod compilé contre une autre version du jeu lève aussi
+(`LinkageError`) — les deux sont attrapés, le type de bloc est noté, on ne le lui
+redemande plus de la partie. Un bloc qui répond « oui » sans cesser d'être
+récoltable est traité comme un refus, sans quoi il serait resollicité à chaque
+scan ; le verdict se lit sur la case seule, jamais sur ses voisines.
+
+**Conditionné à `mobGriefing`.** Le bloc rend sa récolte au monde, pas à
+l'appelant, et un mob ne ramasse au sol que si cette règle est active. Règle
+inactive, le golem ne tente pas la cueillette du tout : vider le plant du joueur
+dans un tas que personne ne ramasse serait pire que de le laisser tranquille.
+
+**Règle 2 : une culture qui pousse sur une plante est un fruit.** Si le
+bloc du dessous est lui-même une plante qui grandit — un `VegetationBlock` qui
+implémente `BonemealableBlock` —, casser le haut ne stérilise rien : la plante
+reste et repose son fruit toute seule. Le golem récolte donc sans replanter,
+puisque replanter est le travail de la plante. C'est le cas du riz, et d'un
+étage de culture quel qu'il soit construit de la même façon.
+
+Aucun champ vanilla ne peut être lu comme un fruit, et pas par chance : une
+`CropBlock` ne se pose que sur `#minecraft:supports_crops` et le nether wart que
+sur `#minecraft:supports_nether_wart`, qui valent respectivement terre labourée
+et sable des âmes — aucun des deux n'est un végétal.
+
+**Une culture sous une culture n'est pas une plante porteuse**, c'est la même
+culture un étage plus bas : une liane à tomates grimpe sa corde jusqu'à trois de
+haut. Sans cette exclusion, le golem prend le haut de la pile pour un fruit et
+casse la liane du joueur — vu en relecture, jamais en jeu.
+
+**Règle 3 : sinon, laisser debout.** Rien ne peut la replanter, le bloc a refusé
+d'être cueilli, et rien ne la repose : la casser stériliserait la case pour de
+bon. Un joueur sans graine ne rase pas sa parcelle non plus, et le golem ne doit
+pas être le moins bon fermier des deux. La case est notée pour que le trajet ne
+soit pas refait à chaque scan.
+
+**Mémoire par case, jamais par type de bloc** — celle des replantations, à ne pas
+confondre avec celle des blocs qui lèvent ci-dessus, qui porte sur du code et
+vaut donc pour tout le type. Le blé peut tomber zéro graine sur
 un tirage malchanceux ; blacklister le type aurait bloqué le blé définitivement,
 puisque c'est le blé récolté qui fournit les graines. La note est levée dès que
 le bloc change ou que le golem porte une graine adaptée.
@@ -221,11 +285,13 @@ le bloc change ou que le golem porte une graine adaptée.
 Aucune culture vanilla n'est concernée : blé, betterave, torchflower et pitcher
 dropent tous l'item qui repose leur bloc — lu dans leurs tables de loot.
 
-Ne sont pas des `CropBlock` et restent donc invisibles au golem :
-`BuddingTomatoBlock`, `RiceBlock` et `WildRiceBlock`.
+Ne sont pas des `CropBlock` et ne sont donc jamais récoltés :
+`BuddingTomatoBlock`, `RiceBlock` et `WildRiceBlock`. `RiceBlock` n'est pas
+invisible pour autant : la règle 2 le lit comme la plante qui porte les
+panicules, sans jamais y toucher.
 
 **À vérifier avant de promettre quoi que ce soit :** que les mods visés soient
-effectivement portés en 26.2. Beaucoup sont encore bloqués en 1.21.x.
+effectivement portés en 26.3. Beaucoup sont encore bloqués en 1.21.x.
 
 ### Survie et inventaire visible
 
