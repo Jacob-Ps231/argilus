@@ -82,6 +82,25 @@ Petit projet perso, ~15 fichiers à terme. Pas de couche d'abstraction non
 demandée, pas de système de « capacités » générique, pas d'interface pour une
 seule implémentation. Le code le plus court qui marche et se lit.
 
+## Règle n°4 : images publiables
+
+Modrinth 6.2a interdit toute image issue d'une IA générative sur la page projet —
+icône, galerie, description. La règle ne vise que la page : ce qui est dans le jar
+n'est pas concerné.
+
+Sont propres, et le resteront : les captures d'écran en jeu, les textures écrites
+par `tools/GenArgilus.java` (du code procédural, seule la palette remonte à une
+planche de concept), et tout ce qui est dessiné à la main.
+
+Ne le sont pas : `icon.png`, produit avec ChatGPT et **à remplacer**, et
+`src/main/resources/assets/argilus/textures/item/argilus_spawn_egg.png`, de la
+même origine mais dans le jar, donc hors 6.2a.
+
+La divulgation « Contains AI-generated content » de la page Modrinth reste cochée
+et **ne se réécrit pas**. Elle est exacte, elle a été posée dès la mise en ligne,
+et la retoucher après un rejet se lirait comme un recul. Le mod reste Unlisted au
+titre de 6.2b : c'est acquis, on ne le conteste pas.
+
 ## Conventions
 
 - Code, identifiants et commentaires **en anglais** (mod destiné à être publié).

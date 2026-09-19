@@ -426,6 +426,22 @@ le disque.
 Test avec au moins un mod de cultures tiers, si disponible en 26.2. Ajustement du
 résolveur générique, documentation des limites.
 
+### Étape 9 — Modèle Blockbench, icône et œuf
+
+Le modèle refait sous Blockbench, et non plus déclaré à la main comme en 7b.
+
+Si la géométrie bouge, `tools/GenArgilus.java` doit suivre dans le même
+mouvement : ses rectangles sont dictés par les `texOffs` de `ArgilusModel`, et un
+décalage d'un côté peint la mauvaise face de l'autre.
+
+L'étape porte aussi les deux images ChatGPT qu'il reste à remplacer, voir la
+règle n°4 : `icon.png`, refait depuis une capture en jeu ou un rendu du nouveau
+modèle, et l'œuf de spawn, redessiné à la main — `GenArgilus.java` refuse
+délibérément de produire ces deux-là pour ne pas écraser de l'artwork.
+
+*Validé quand :* le golem rendu en jeu correspond à l'export, les six finitions
+sont toujours distinctes, et la page Modrinth ne porte plus aucune image générée.
+
 ## Hors périmètre pour la v1
 
 Cultures aquatiques ou multi-blocs, récolte par clic droit avec repousse
