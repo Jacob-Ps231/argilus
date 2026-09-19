@@ -99,15 +99,32 @@ seule implémentation. Le code le plus court qui marche et se lit.
    terminée.
 3. En cas de crash : lis `logs/latest.log`, remonte-moi la stacktrace pertinente,
    pas le fichier entier.
-4. **Avant chaque commit, faire relire le diff par un sous-agent** (outil
-   `Agent`), en lecture seule : il ne modifie rien et ne commite rien. Lui
-   donner le diff à committer (`git diff` **et** `git diff --staged`) et ce
-   fichier — règles n°1 à n°3, Conventions, et les « Pièges connus » plus bas.
-   Ce qu'il cherche : justesse du code (client/serveur, coût par tick, NBT),
-   signatures vanilla réellement vérifiées et non supposées, commentaires qui
-   décrivent encore ce que fait le code. Tu me remontes ce qu'il trouve et tu
-   corriges. Un « rien à signaler » se dit aussi.
+4. **Une relecture par sous-agent, quand l'étape est jouée et validée** (outil
+   `Agent`), en lecture seule : il ne modifie rien et ne commite rien. Une seule
+   passe sur l'étape entière, pas une par correctif.
+
+   Lui donner le diff à committer (`git diff` **et** `git diff --staged`), ce
+   fichier — règles n°1 à n°3, Conventions, « Pièges connus » plus bas — et
+   **ce qui a déjà été vérifié dans la session** : signatures lues, versions
+   confirmées, faits établis. Sans ça il les redécouvre, et c'est cher.
+
+   Ce qu'il cherche, dans cet ordre : justesse du code (client/serveur, coût par
+   tick, NBT), signatures vanilla réellement vérifiées et non supposées,
+   commentaires qui décrivent encore ce que fait le code. La prose des docs
+   passe en dernier, et une seule fois.
+
+   **Pour les tours suivants, rappeler le même agent** (`SendMessage`) plutôt
+   que d'en lancer un neuf : il garde ce qu'il a établi. Quand un correctif est
+   exactement ce qu'il a prescrit, un message ciblé sur ces lignes suffit. Un
+   commit de version, de doc seule ou de nettoyage n'en demande aucune.
+
+   Tu me remontes ce qu'il trouve et tu corriges. Un « rien à signaler » se dit
+   aussi.
 5. Un commit git par étape validée, une fois cette relecture passée.
+6. Une session par étape. Le contexte d'une session longue est relu à chaque
+   tour : à la fin d'une grosse session, la même commande coûte six fois ce
+   qu'elle coûtait au début. Ce qui doit survivre est dans ce fichier, dans
+   `SPEC.md` et dans ta mémoire — pas dans l'historique de conversation.
 
 ## Pièges connus sur ce projet
 
