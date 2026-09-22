@@ -14,7 +14,10 @@ import re.jerome.argilus.entity.ArgilusEntity;
 public final class ModEntityTypes {
 	public static final EntityType<ArgilusEntity> ARGILUS = create(
 			"argilus",
-			EntityType.Builder.of(ArgilusEntity::new, MobCategory.MISC).sized(0.49F, 0.98F).eyeHeight(0.8F));
+			// The eyes are painted on the second of the four rows of the face, 14.5
+			// units off the ground. The box stays the copper golem's: it holds the
+			// body, and the arms stand outside it the way an iron golem's do.
+			EntityType.Builder.of(ArgilusEntity::new, MobCategory.MISC).sized(0.49F, 0.98F).eyeHeight(0.9F));
 
 	private ModEntityTypes() {
 	}

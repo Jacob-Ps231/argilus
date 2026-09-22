@@ -442,6 +442,18 @@ délibérément de produire ces deux-là pour ne pas écraser de l'artwork.
 *Validé quand :* le golem rendu en jeu correspond à l'export, les six finitions
 sont toujours distinctes, et la page Modrinth ne porte plus aucune image générée.
 
+Scindée en deux, les images demandant un travail à la main que le modèle
+n'attend pas :
+
+- **9a** — le modèle refait sous Blockbench et les textures qui le suivent. La
+  tête passe à 8×4×8 et son patron descend en `texOffs(0, 42)`, faute de place à
+  côté de la couronne ; la hitbox reste celle du golem de cuivre, seule la
+  hauteur des yeux suit la nouvelle tête. Le générateur y gagne la mousse en
+  taches, des facettes de pierre, des fleurs et des fissures, celles du visage
+  écrites en dur. Validée en jeu le 22 septembre 2026.
+- **9b** — `icon.png` et l'œuf de spawn, puis la page Modrinth. C'est elle qui
+  porte la dernière clause du *Validé quand*.
+
 ## Hors périmètre pour la v1
 
 Cultures aquatiques ou multi-blocs, récolte par clic droit avec repousse
