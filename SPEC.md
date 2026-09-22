@@ -452,7 +452,10 @@ n'attend pas :
   taches, des facettes de pierre, des fleurs et des fissures, celles du visage
   écrites en dur. Validée en jeu le 22 septembre 2026.
 - **9b** — `icon.png` et l'œuf de spawn, puis la page Modrinth. C'est elle qui
-  porte la dernière clause du *Validé quand*.
+  porte la dernière clause du *Validé quand*. Les images sont faites le 22
+  septembre 2026 : les deux icônes sont recadrées depuis une capture en jeu,
+  l'œuf est un œuf d'argile moussu en 16×16, peint dans Blockbench. Reste la
+  page Modrinth.
 
 ## Hors périmètre pour la v1
 

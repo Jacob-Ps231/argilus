@@ -92,9 +92,10 @@ Sont propres, et le resteront : les captures d'écran en jeu, les textures écri
 par `tools/GenArgilus.java` (du code procédural, seule la palette remonte à une
 planche de concept), et tout ce qui est dessiné à la main.
 
-Ne le sont pas : `icon.png`, produit avec ChatGPT et **à remplacer**, et
-`src/main/resources/assets/argilus/textures/item/argilus_spawn_egg.png`, de la
-même origine mais dans le jar, donc hors 6.2a.
+Les deux images ChatGPT du départ sont remplacées : `icon.png` et l'icône du jar
+sont recadrées depuis une capture en jeu, et l'œuf de spawn est peint pixel par
+pixel dans Blockbench. Plus aucune image générée n'est suivie par git. Toute
+image de référence dont l'origine n'est pas établie reste hors du dépôt.
 
 La divulgation « Contains AI-generated content » de la page Modrinth reste cochée
 et **ne se réécrit pas**. Elle est exacte, elle a été posée dès la mise en ligne,
