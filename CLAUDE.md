@@ -33,8 +33,8 @@ Avant d'écrire du code touchant à une API que tu n'as pas déjà lue **dans ce
 session** :
 
 1. Consulte `docs.fabricmc.net`. Pas de page « Porting to 26.3 » à ce jour : le
-   mémo `SETUP-MC-MODDING-26.3.md` (dans `Documents\ESPACE AGENT\`) tient lieu
-   de doc de portage.
+   mémo `SETUP-MC-MODDING-26.3.md` (dans
+   `Documents\ESPACE AGENT\MOD MINECRAFT\`) tient lieu de doc de portage.
 2. Lis les sources vanilla décompilées dans le cache Gradle — le jeu est
    désobfusqué, elles sont lisibles directement.
 3. Si tu n'es pas sûr d'une signature, dis-le et vérifie. N'invente jamais un nom
