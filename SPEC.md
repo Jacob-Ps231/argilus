@@ -83,8 +83,9 @@ réelle. La citrouille tombe entière en vanilla, elle n'est pas affectée.
 
 **3. Baies douces**
 
-Le buisson n'est jamais cassé : à partir de l'âge 2, il est cueilli et retombe à
-l'âge 1, comme au clic droit du joueur. Pas de replantation — le buisson est
+Le buisson n'est jamais cassé : à l'âge 3, son maximum, il est cueilli et retombe
+à l'âge 1, comme au clic droit du joueur. Le joueur peut cueillir dès l'âge 2,
+mais le golem attend le buisson plein, qui donne plus de baies. Pas de replantation — le buisson est
 toujours debout — et pas de plantation de nouveaux buissons, décision explicite
 pour que le golem ne colonise pas le terrain.
 

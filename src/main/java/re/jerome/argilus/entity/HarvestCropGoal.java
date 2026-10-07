@@ -559,11 +559,12 @@ public class HarvestCropGoal extends Goal {
 				&& state.getValue(NetherWartBlock.AGE) >= NetherWartBlock.MAX_AGE;
 	}
 
-	// Age 2 is the point at which vanilla lets a player pick, and picking is all
-	// the golem does here: no replanting, because the bush is still standing.
+	// Vanilla lets a player pick from age 2, but the full bush pays more, so the
+	// golem waits for it. Picking is all it does: no replanting, because the
+	// bush is still standing.
 	private static boolean isPickableBush(BlockState state) {
 		return state.getBlock() instanceof SweetBerryBushBlock
-				&& state.getValue(SweetBerryBushBlock.AGE) > 1;
+				&& state.getValue(SweetBerryBushBlock.AGE) >= SweetBerryBushBlock.MAX_AGE;
 	}
 
 	// A bush names its own picked yield and offers nothing to ask, so the key is
