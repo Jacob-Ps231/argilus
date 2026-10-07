@@ -458,8 +458,44 @@ n'attend pas :
   l'œuf est un œuf d'argile moussu en 16×16, peint dans Blockbench. Reste la
   page Modrinth.
 
+### Étape 10 — Canne à sucre
+
+Première culture multi-blocs, ajoutée après la v1 à la demande de Jérôme. Elle
+sort avec les correctifs de portée du dépôt et des baies dans une 1.4.0.
+
+**Le pied ne se touche jamais.** La canne repousse d'elle-même depuis son bloc du
+bas, comme chez le joueur qui la récolte. Pas de replantation, donc pas de graine
+à résoudre, et pas de plantation de nouvelles cannes, pour la même raison que les
+baies : le golem ne colonise pas le terrain.
+
+**Un seul bloc cassé par canne : le 2ᵉ**, celui posé sur le pied. Tout ce qui est
+au-dessus perd son support et tombe en items, que le goal de ramassage existant
+récupère. Une action par canne quelle que soit sa hauteur, et rien à atteindre en
+hauteur : le bloc visé est à hauteur de golem. Une canne d'un seul bloc n'est pas
+mûre.
+
+**Ciblée par tag**, `argilus:stacked_crops`, qui contient `minecraft:sugar_cane`.
+Un bloc du tag est une cible quand celui d'en dessous est du même bloc et celui
+encore en dessous ne l'est pas. Un mod qui ajoute une canne qui pousse de la même
+façon n'a qu'à rejoindre le tag. Rien n'est nommé dans le code.
+
+**Coût par tick inchangé** : la détection s'ajoute au scan existant, en cache et
+rafraîchi périodiquement, et ne lit que deux blocs de plus par candidat.
+
+**Hors de l'étape** : le bambou, qui pousse autrement, et le cactus, qui blesse et
+détruit les items qui le touchent. Ni l'un ni l'autre n'entre dans le tag par
+défaut.
+
+Les items tombent souvent dans l'eau, puisque la canne pousse au bord : le goal
+de ramassage doit aller les chercher, sans que le golem reste coincé dans la
+rigole. Le tableau des cultures gérées, en tête de ce fichier, gagne la canne.
+
+*Validé quand :* un champ de cannes de hauteurs mêlées est récolté en laissant
+tous les pieds debout, les cannes d'un bloc sont ignorées, tout ce qui tombe est
+ramassé puis déposé, y compris depuis l'eau, et le champ repousse seul.
+
 ## Hors périmètre pour la v1
 
-Cultures aquatiques ou multi-blocs, récolte par clic droit avec repousse
-partielle, verrues du Nether, plusieurs golems coordonnés, interface de
-configuration en jeu, animations avancées.
+Cultures aquatiques ou multi-blocs (sauf la canne à sucre, étape 10), récolte
+par clic droit avec repousse partielle, verrues du Nether, plusieurs golems
+coordonnés, interface de configuration en jeu, animations avancées.
