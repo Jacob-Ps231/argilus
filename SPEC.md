@@ -25,7 +25,7 @@ bien faits.
 | Points de vie          | 20, jamais de despawn                             |
 | Déclencheur de dépôt   | inventaire plein **ou** plus rien à faire depuis 100 ticks (inventaire non vide) |
 | Conteneur de dépôt     | le plus proche du centre du champ détecté, mémorisé |
-| Cultures gérées        | toute `CropBlock` mûre (vanilla et moddée), citrouilles/melons, baies douces, nether wart |
+| Cultures gérées        | toute `CropBlock` mûre (vanilla et moddée), citrouilles/melons, baies douces, nether wart, canne à sucre |
 | Labourage              | par adjacence à de la terre labourée, si une graine est disponible |
 | Poudre d'os            | prélevée dans le conteneur pendant un dépôt, 1 slot réservé |
 | Melons                 | récoltés en tranches, comme à mains nues |
@@ -490,12 +490,22 @@ Les items tombent souvent dans l'eau, puisque la canne pousse au bord : le goal
 de ramassage doit aller les chercher, sans que le golem reste coincé dans la
 rigole. Le tableau des cultures gérées, en tête de ce fichier, gagne la canne.
 
+Lu dans le code vanilla : un `Mob` ramasse avec une portée verticale nulle, et
+un item qui flotte dépasse à peine le niveau de la berge. Depuis la berge, le
+golem le frôlait sans le prendre et devait entrer dans l'eau. Sa portée passe à
+un bloc en hauteur, celle de l'allay — et un bloc vers le bas aussi, comme chez
+elle. S'il entre quand même dans l'eau, il flotte (`FloatGoal`) et vanilla le
+hisse sur la berge au contact.
+
+Un item peut attendre un moment : la récolte passe avant le ramassage, et un
+item hors d'atteinte est remis à 100 ticks plus tard. Constaté en jeu, il finit
+ramassé.
+
 *Validé quand :* un champ de cannes de hauteurs mêlées est récolté en laissant
 tous les pieds debout, les cannes d'un bloc sont ignorées, tout ce qui tombe est
 ramassé puis déposé, y compris depuis l'eau, et le champ repousse seul.
 
 ## Hors périmètre pour la v1
 
-Cultures aquatiques ou multi-blocs (sauf la canne à sucre, étape 10), récolte
-par clic droit avec repousse partielle, verrues du Nether, plusieurs golems
-coordonnés, interface de configuration en jeu, animations avancées.
+Cultures aquatiques ou multi-blocs (sauf la canne à sucre, étape 10), plusieurs
+golems coordonnés, interface de configuration en jeu, animations avancées.

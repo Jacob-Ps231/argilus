@@ -14,6 +14,10 @@ import re.jerome.argilus.ArgilusConfig;
 // within reach once canPickUpLoot is true, so this goal is pure navigation and
 // the collecting stays vanilla.
 //
+// Items in water need nothing more. The entity's pickup reach takes what floats
+// beside the bank, which usually ends the goal before the golem wades in; one
+// that does go in floats, and vanilla lifts it back out against the bank.
+//
 // No block cache either, unlike the other goals. Querying entities in a box is
 // indexed and cheap, which is why vanilla itself does it every other tick.
 public class CollectItemsGoal extends Goal {

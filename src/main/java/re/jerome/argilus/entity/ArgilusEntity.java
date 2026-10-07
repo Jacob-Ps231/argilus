@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -56,6 +57,7 @@ import re.jerome.argilus.ArgilusConfig;
 public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, ContainerUser {
 	private static final double CONTAINER_REACH = 3.0;
 	private static final int BONE_MEAL_SUPPRESSION = 1200;
+	private static final Vec3i PICKUP_REACH_WITH_HEIGHT = new Vec3i(1, 1, 1);
 
 	// Borrowed from the clay block until the golem gets sounds of its own, read
 	// from the block rather than hardcoded so it follows any vanilla change.
@@ -381,12 +383,23 @@ public class ArgilusEntity extends PathfinderMob implements InventoryCarrier, Co
 		return true;
 	}
 
-	// Vanilla only offers items the golem physically walks over, so this stays
-	// scoped to its working area without any radius logic of our own. It also
-	// lets it recover the contents of a chest a player broke.
+	// Vanilla only offers items within the pickup reach, and CollectItemsGoal
+	// bounds how far the golem walks for them, so no radius logic is needed here.
+	// It also lets it recover the contents of a chest a player broke.
 	@Override
 	public boolean wantsToPickUp(ServerLevel level, ItemStack stack) {
 		return this.inventory.canAddItem(stack);
+	}
+
+	// One block of vertical reach, the allay's, where vanilla mobs get none. An
+	// item floating in a water channel bobs with its top barely above the bank,
+	// so with no vertical reach a golem on the bank all but missed it and only
+	// took it by wading in. Sugar cane grows at the water's edge, so that is
+	// where much of its harvest lands. The box grows downward too, as the
+	// allay's does: the golem also takes items one block below its feet.
+	@Override
+	protected Vec3i getPickupReach() {
+		return PICKUP_REACH_WITH_HEIGHT;
 	}
 
 	@Override

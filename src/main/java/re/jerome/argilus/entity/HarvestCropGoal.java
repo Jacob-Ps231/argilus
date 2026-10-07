@@ -39,6 +39,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import re.jerome.argilus.Argilus;
 import re.jerome.argilus.ArgilusConfig;
+import re.jerome.argilus.ArgilusTags;
 
 // Detection mirrors the villager's HarvestFarmland behavior: any CropBlock at
 // max age, no hardcoded block list, so modded crops extending CropBlock work.
@@ -63,6 +64,11 @@ import re.jerome.argilus.ArgilusConfig;
 // table happens to sit. A modded bush that ships one there hands over its own
 // berries; one that ships none inherits vanilla's pick, sweet berries included,
 // and the golem brings back exactly what a player would.
+//
+// Sugar cane has no age to read, and no class a modded cane would extend, so
+// stacked crops come from a tag instead. Ripe means two blocks high or more,
+// and the cut is always the second block: everything above falls with it, and
+// the foot, never touched, grows the stalk back.
 public class HarvestCropGoal extends Goal {
 	private static final int VERTICAL_REACH = 2;
 	private static final double HARVEST_REACH = 2.5;
@@ -184,8 +190,8 @@ public class HarvestCropGoal extends Goal {
 					Blocks.NETHER_WART.defaultBlockState(), SoundEvents.NETHER_WART_PLANTED);
 		} else if (isPickableBush(state)) {
 			this.pickBerries(level, pos, state);
-		} else if (hasStemPointingAt(level, pos)) {
-			this.harvestFruit(level, pos, state);
+		} else if (isStackedCropCut(level, pos, state) || hasStemPointingAt(level, pos)) {
+			this.breakBareHanded(level, pos, state);
 		}
 	}
 
@@ -319,7 +325,11 @@ public class HarvestCropGoal extends Goal {
 	// gets. Harvesting them whole through a silk touch loot context was free
 	// value the golem had no business creating. The stem itself is never
 	// touched, only the position it points at.
-	private void harvestFruit(ServerLevel level, BlockPos pos, BlockState state) {
+	//
+	// A stacked crop is cut the same way. Only the cut block's own drop lands in
+	// the inventory: what stood on it loses its support, breaks a tick later
+	// and falls as items, which the collecting goal fetches.
+	private void breakBareHanded(ServerLevel level, BlockPos pos, BlockState state) {
 		List<ItemStack> drops = Block.getDrops(state, level, pos, null, this.golem, ItemStack.EMPTY);
 
 		level.destroyBlock(pos, false, this.golem);
@@ -474,7 +484,8 @@ public class HarvestCropGoal extends Goal {
 
 					if (state.getBlock() instanceof CropBlock crop && crop.isMaxAge(state)) {
 						found = this.isUnreplantable(level, cursor) ? null : cursor.immutable();
-					} else if (isRipeWart(state) || isPickableBush(state)) {
+					} else if (isRipeWart(state) || isPickableBush(state)
+							|| isStackedCropCut(level, cursor, state)) {
 						found = cursor.immutable();
 					} else if (state.getBlock() instanceof AttachedStemBlock) {
 						// Two stems can point at the same pumpkin.
@@ -520,7 +531,7 @@ public class HarvestCropGoal extends Goal {
 	private static boolean isHarvestable(ServerLevel level, BlockPos pos) {
 		BlockState state = level.getBlockState(pos);
 
-		if (isRipe(state) || isPickableBush(state)) {
+		if (isRipe(state) || isPickableBush(state) || isStackedCropCut(level, pos, state)) {
 			return true;
 		}
 
@@ -565,6 +576,22 @@ public class HarvestCropGoal extends Goal {
 	private static boolean isPickableBush(BlockState state) {
 		return state.getBlock() instanceof SweetBerryBushBlock
 				&& state.getValue(SweetBerryBushBlock.AGE) >= SweetBerryBushBlock.MAX_AGE;
+	}
+
+	// The second block of a stalk: the same block below it, and below that
+	// something else, which is the ground the foot stands on. A stalk one block
+	// high has no such block, so it is not ripe; the foot never matches, so it
+	// is never cut. The tag test comes first and keeps the two extra reads off
+	// every other block in the scan.
+	private static boolean isStackedCropCut(ServerLevel level, BlockPos pos, BlockState state) {
+		if (!state.is(ArgilusTags.STACKED_CROPS)) {
+			return false;
+		}
+
+		Block block = state.getBlock();
+
+		return level.getBlockState(pos.below()).is(block)
+				&& !level.getBlockState(pos.below(2)).is(block);
 	}
 
 	// A bush names its own picked yield and offers nothing to ask, so the key is
