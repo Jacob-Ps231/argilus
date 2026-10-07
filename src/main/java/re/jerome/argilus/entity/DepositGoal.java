@@ -4,12 +4,19 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 import re.jerome.argilus.ArgilusConfig;
 import re.jerome.argilus.ArgilusTags;
@@ -24,16 +31,23 @@ public class DepositGoal extends Goal {
 	private static final int RETRY_COOLDOWN = 200;
 	private static final int SEARCH_VERTICAL_REACH = 4;
 
+	// The copper golem's reach, from TransportItemsBetweenContainers: the
+	// container's shape grown by a block sideways but only half a block
+	// vertically, so a chest one floor down is out of reach from the floor above.
+	private static final double REACH = 1.0;
+	private static final double VERTICAL_REACH = 0.5;
+
 	private final ArgilusEntity golem;
 
-	// Containers that refused a delivery, and until when to leave them alone.
-	// Without this the search would keep electing the same full chest.
-	private final Map<BlockPos, Long> fullUntil = new HashMap<>();
+	// Containers that refused a delivery or could not be reached, and until when
+	// to leave them alone. Without this the search would keep electing them.
+	private final Map<BlockPos, Long> avoidUntil = new HashMap<>();
 
 	private @Nullable BlockPos container;
 	private long nextAttemptTime;
 	private int openTicks;
 	private boolean waitingForSpace;
+	private boolean travelling;
 
 	public DepositGoal(ArgilusEntity golem) {
 		this.golem = golem;
@@ -87,6 +101,7 @@ public class DepositGoal extends Goal {
 		this.closeContainer();
 		this.container = null;
 		this.waitingForSpace = false;
+		this.travelling = false;
 	}
 
 	@Override
@@ -120,23 +135,42 @@ public class DepositGoal extends Goal {
 			return;
 		}
 
-		if (!this.container.closerToCenterThan(this.golem.position(), this.golem.getContainerInteractionRange())) {
+		if (!this.canReach(level, this.container)) {
+			// Pushed away or cut off mid-opening: close the lid before moving on.
+			this.closeContainer();
 			this.openTicks = 0;
 
-			if (this.golem.getNavigation().isDone()
-					&& !this.golem.getNavigation().moveTo(
-							this.container.getX() + 0.5,
-							this.container.getY(),
-							this.container.getZ() + 0.5,
-							SPEED)) {
-				// Unreachable: give up on this one for a while.
-				this.container = null;
-				this.nextAttemptTime = now + RETRY_COOLDOWN;
+			if (!this.golem.getNavigation().isDone()) {
+				return;
 			}
 
+			// Ground navigation refuses to plan in mid-air, which is no verdict on
+			// the container. Wait for the landing. Same test as
+			// GroundPathNavigation.canUpdatePath, so water and a boat still plan.
+			if (!this.travelling
+					&& !this.golem.onGround()
+					&& !this.golem.isInLiquid()
+					&& !this.golem.isPassenger()) {
+				return;
+			}
+
+			// A path that ends out of reach, or no path at all from the ground: the
+			// container is behind a wall or under the floor, or the way is blocked.
+			// Pick another one.
+			if (this.travelling || !this.golem.getNavigation().moveTo(
+					this.container.getX() + 0.5,
+					this.container.getY(),
+					this.container.getZ() + 0.5,
+					SPEED)) {
+				this.avoid(level, this.container);
+				return;
+			}
+
+			this.travelling = true;
 			return;
 		}
 
+		this.travelling = false;
 		this.golem.getNavigation().stop();
 		this.lookAtContainer();
 
@@ -164,24 +198,60 @@ public class DepositGoal extends Goal {
 		}
 
 		// It could not take everything. Look elsewhere before giving up.
-		this.fullUntil.put(used, now + RETRY_COOLDOWN);
-		this.golem.setDepositPos(null);
-		this.container = null;
-
-		BlockPos alternative = this.resolveContainer(level);
-
-		if (alternative != null) {
-			this.container = alternative;
-			this.nextAttemptTime = now;
+		if (this.avoid(level, used)) {
 			return;
 		}
 
-		this.nextAttemptTime = now + RETRY_COOLDOWN;
 		this.waitingForSpace = this.golem.isInventoryFull();
 
 		if (this.waitingForSpace) {
 			this.container = used;
 		}
+	}
+
+	// Sets the container aside for a while and moves on to the next best one.
+	// Returns false when there is none.
+	private boolean avoid(ServerLevel level, BlockPos pos) {
+		long now = level.getGameTime();
+		this.avoidUntil.put(pos, now + RETRY_COOLDOWN);
+		this.golem.setDepositPos(null);
+		this.container = this.resolveContainer(level);
+		this.travelling = false;
+
+		if (this.container != null) {
+			this.nextAttemptTime = now;
+			return true;
+		}
+
+		this.nextAttemptTime = now + RETRY_COOLDOWN;
+		return false;
+	}
+
+	private boolean canReach(ServerLevel level, BlockPos pos) {
+		VoxelShape shape = level.getBlockState(pos).getCollisionShape(level, pos);
+		AABB bounds = shape.isEmpty() ? new AABB(0, 0, 0, 1, 1, 1) : shape.bounds();
+
+		return bounds.inflate(REACH, VERTICAL_REACH, REACH).move(pos).intersects(this.golem.getBoundingBox())
+				&& this.canSeeAnySide(level, pos);
+	}
+
+	// Also from the copper golem: one face in sight from mid-body is enough. Six
+	// rays, and only once the golem is already close.
+	private boolean canSeeAnySide(ServerLevel level, BlockPos pos) {
+		Vec3 from = this.golem.position().add(0, this.golem.getBoundingBox().getYsize() / 2, 0);
+		Vec3 center = Vec3.atCenterOf(pos);
+
+		for (Direction side : Direction.values()) {
+			Vec3 face = center.add(0.5 * side.getStepX(), 0.5 * side.getStepY(), 0.5 * side.getStepZ());
+			BlockHitResult hit = level.clip(
+					new ClipContext(from, face, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this.golem));
+
+			if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// Returns true when something could not be handed over.
@@ -271,12 +341,12 @@ public class DepositGoal extends Goal {
 
 	private @Nullable BlockPos resolveContainer(ServerLevel level) {
 		long now = level.getGameTime();
-		this.fullUntil.values().removeIf(until -> until <= now);
+		this.avoidUntil.values().removeIf(until -> until <= now);
 
 		BlockPos remembered = this.golem.getDepositPos();
 
 		if (remembered != null
-				&& !this.fullUntil.containsKey(remembered)
+				&& !this.avoidUntil.containsKey(remembered)
 				&& HopperBlockEntity.getContainerAt(level, remembered) != null) {
 			return remembered;
 		}
@@ -296,7 +366,7 @@ public class DepositGoal extends Goal {
 					cursor.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
 
 					if (!level.isLoaded(cursor)
-							|| this.fullUntil.containsKey(cursor)
+							|| this.avoidUntil.containsKey(cursor)
 							|| !level.getBlockState(cursor).is(ArgilusTags.DEPOSIT_CONTAINERS)) {
 						continue;
 					}
