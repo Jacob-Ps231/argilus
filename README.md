@@ -24,8 +24,9 @@ Each golem is summoned with one of six clay finishes, drawn at random.
 | Harvest | any fully grown crop within its radius |
 | Replant | using a seed taken from the crop's own drops |
 | Pumpkins and melons | only fruit attached to a stem, and melons in slices, as a bare hand gets them |
-| Sweet berries | picked without breaking the bush, which regrows as usual |
+| Sweet berries | picked once the bush is full, without breaking it, so it regrows as usual |
 | Nether wart | harvested and replanted like any crop, on anything that supports it |
+| Sugar cane | cut above the bottom block, which is never touched and grows the stalk back; a single block is left to grow |
 | Collect | walks to items dropped nearby and picks them up |
 | Deposit | into a chest or barrel it remembers, moving on to another when one fills |
 | Sow | bare ground beside a tile already in production, and only with a seed to hand |
@@ -107,17 +108,21 @@ modded plant extending either is handled too. A modded bush yields its own
 berries when it ships a loot table at `harvest/<its block id>` in its own
 namespace; without one it yields sweet berries, which is what the game itself
 hands you for a bush that has not redefined its own picking.
-Anything outside those three families is invisible to the golem, which is the
-right outcome for what the generic rule cannot handle.
+A modded cane that grows the way sugar cane does, by stacking copies of itself on
+a foot, only has to join the `argilus:stacked_crops` block tag.
+
+Anything outside those families is invisible to the golem, which is the right
+outcome for what the generic rule cannot handle.
 
 ## Requirements
 
 Minecraft 26.3, Fabric Loader 0.19.5 or later, Fabric API, Java 25.
 
-## Deposit containers
+## Tags
 
-Chests, trapped chests and barrels, through the `argilus:deposit_containers`
-block tag. A datapack can widen it without touching the mod.
+Deposit containers are chests, trapped chests and barrels, through the
+`argilus:deposit_containers` block tag. Stacked crops are sugar cane, through
+`argilus:stacked_crops`. A datapack can widen either without touching the mod.
 
 ## Bugs and sources
 
